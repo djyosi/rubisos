@@ -377,9 +377,193 @@
             font-size: 12px;
             font-weight: 600;
         }
+
+        /* Side Menu */
+        .menu-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: #333;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .menu-btn span {
+            display: block;
+            width: 24px;
+            height: 3px;
+            background: #fff;
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+        .menu-btn.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+        .menu-btn.active span:nth-child(2) {
+            opacity: 0;
+        }
+        .menu-btn.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            z-index: 1002;
+            transition: left 0.3s ease;
+            padding-top: 80px;
+            box-shadow: 5px 0 30px rgba(0,0,0,0.5);
+        }
+        .side-menu.active {
+            left: 0;
+        }
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1001;
+            display: none;
+        }
+        .menu-overlay.active {
+            display: block;
+        }
+
+        .menu-header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            text-align: center;
+        }
+        .menu-header .logo-small {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        .menu-header h3 {
+            color: #fff;
+            font-size: 18px;
+        }
+        .menu-header p {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .menu-items {
+            padding: 20px 0;
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            color: #fff;
+            text-decoration: none;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .menu-item:hover,
+        .menu-item.active {
+            background: linear-gradient(90deg, #ff4444 0%, transparent 100%);
+            border-left: 4px solid #ff4444;
+        }
+        .menu-item .icon {
+            font-size: 24px;
+            margin-right: 15px;
+            width: 30px;
+            text-align: center;
+        }
+        .menu-item .label {
+            font-size: 16px;
+        }
+        .menu-item .badge {
+            margin-left: auto;
+            background: #ff4444;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .menu-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            border-top: 1px solid #333;
+        }
+        .menu-footer .menu-item {
+            color: #888;
+        }
+        .menu-footer .menu-item:hover {
+            color: #fff;
+        }
     </style>
 </head>
 <body>
+    <!-- Menu Button -->
+    <button class="menu-btn" id="menuBtn" onclick="toggleMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <!-- Menu Overlay -->
+    <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+
+    <!-- Side Menu -->
+    <nav class="side-menu" id="sideMenu">
+        <div class="menu-header">
+            <div class="logo-small">🆘</div>
+            <h3>rubiSOS</h3>
+            <p id="menuUserName">Guest</p>
+        </div>
+        
+        <div class="menu-items">
+            <a class="menu-item active" onclick="navigateTo('dashboard')">
+                <span class="icon">🏠</span>
+                <span class="label">Dashboard</span>
+            </a>
+            <a class="menu-item" onclick="navigateTo('profile')">
+                <span class="icon">👤</span>
+                <span class="label">My Profile</span>
+            </a>
+            <a class="menu-item" onclick="navigateTo('alerts')">
+                <span class="icon">🚨</span>
+                <span class="label">Alert History</span>
+                <span class="badge" id="alertBadge" style="display: none;">0</span>
+            </a>
+            <a class="menu-item" onclick="navigateTo('nearby')">
+                <span class="icon">👥</span>
+                <span class="label">Nearby Helpers</span>
+            </a>
+            <a class="menu-item" onclick="navigateTo('settings')">
+                <span class="icon">⚙️</span>
+                <span class="label">Settings</span>
+            </a>
+        </div>
+        
+        <div class="menu-footer">
+            <a class="menu-item" onclick="logout()">
+                <span class="icon">🚪</span>
+                <span class="label">Logout</span>
+            </a>
+        </div>
+    </nav>
+
     <!-- Connection Status -->
     <div class="connection-bar" id="connectionBar">
         <span id="connectionText">Connecting...</span>
@@ -504,6 +688,156 @@
 
         <button class="btn btn-primary" id="sendAlertConfirm">🚨 SEND ALERT</button>
         <button class="btn btn-secondary" onclick="showScreen('screen-dashboard')">Cancel</button>
+    </div>
+
+    <!-- SCREEN 4: Profile -->
+    <div class="screen" id="screen-profile">
+        <div class="header">
+            <h1>My Profile</h1>
+            <p class="tagline">Your personal information</p>
+        </div>
+
+        <div class="dashboard-header" style="margin-bottom: 20px;">
+            <div class="user-info">
+                <h2 id="profileName">--</h2>
+                <p style="color: #888;" id="profilePhone">--</p>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="profileNameInput" placeholder="Your name">
+        </div>
+
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="profileEmailInput" placeholder="your@email.com">
+        </div>
+
+        <div class="form-group">
+            <label>Blood Type</label>
+            <select id="profileBloodType">
+                <option value="">Not specified</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Medical Notes</label>
+            <textarea id="profileMedicalNotes" rows="3" placeholder="Any medical conditions or allergies..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Emergency Contact Name</label>
+            <input type="text" id="profileEmergencyName" placeholder="Contact name">
+        </div>
+
+        <div class="form-group">
+            <label>Emergency Contact Phone</label>
+            <input type="tel" id="profileEmergencyPhone" placeholder="+972...">
+        </div>
+
+        <button class="btn btn-primary" onclick="saveProfile()">💾 Save Changes</button>
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')">Back</button>
+    </div>
+
+    <!-- SCREEN 5: Alert History -->
+    <div class="screen" id="screen-alerts">
+        <div class="header">
+            <h1>Alert History</h1>
+            <p class="tagline">Your past emergency alerts</p>
+        </div>
+
+        <div id="alertsList">
+            <!-- Alerts will be loaded here -->
+            <div class="stat-card" style="text-align: center; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">📋</div>
+                <p style="color: #888;">No alerts yet</p>
+            </div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+    </div>
+
+    <!-- SCREEN 6: Nearby Helpers -->
+    <div class="screen" id="screen-nearby">
+        <div class="header">
+            <h1>Nearby Helpers</h1>
+            <p class="tagline">People who can respond to alerts</p>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 20px;">
+            <div class="stat-card">
+                <div class="stat-value" id="nearbyOnline">0</div>
+                <div class="stat-label">Online Now</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="nearbyTotal">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+        </div>
+
+        <div class="responders-list" id="nearbyList">
+            <p style="color: #888; text-align: center; padding: 20px;">Loading nearby users...</p>
+        </div>
+
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+    </div>
+
+    <!-- SCREEN 7: Settings -->
+    <div class="screen" id="screen-settings">
+        <div class="header">
+            <h1>Settings</h1>
+            <p class="tagline">Customize your preferences</p>
+        </div>
+
+        <div class="form-group">
+            <label>Alert Radius (km)</label>
+            <input type="range" id="settingsRadius" min="1" max="50" value="10" style="width: 100%;" oninput="document.getElementById('radiusValue').textContent = this.value + ' km'">
+            <p style="color: #888; text-align: center; margin-top: 10px;" id="radiusValue">10 km</p>
+        </div>
+
+        <div class="form-group">
+            <label>Alert Types I Can Receive</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 5px; background: #222; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                    <input type="checkbox" class="alert-type-checkbox" value="medical" checked> 🏥 Medical
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; background: #222; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                    <input type="checkbox" class="alert-type-checkbox" value="fire" checked> 🔥 Fire
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; background: #222; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                    <input type="checkbox" class="alert-type-checkbox" value="security" checked> 🛡️ Security
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; background: #222; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                    <input type="checkbox" class="alert-type-checkbox" value="accident" checked> 🚗 Accident
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="settingsPush" checked style="width: auto;">
+                <span>Enable Push Notifications</span>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="settingsAvailable" checked style="width: auto;">
+                <span>Available to Receive Alerts</span>
+            </label>
+        </div>
+
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')">Back</button>
     </div>
 
     <!-- INCOMING ALERT MODAL -->
@@ -866,6 +1200,205 @@
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+            closeMenu();
+        }
+
+        function toggleMenu() {
+            document.getElementById('menuBtn').classList.toggle('active');
+            document.getElementById('sideMenu').classList.toggle('active');
+            document.getElementById('menuOverlay').classList.toggle('active');
+        }
+
+        function closeMenu() {
+            document.getElementById('menuBtn').classList.remove('active');
+            document.getElementById('sideMenu').classList.remove('active');
+            document.getElementById('menuOverlay').classList.remove('active');
+        }
+
+        function navigateTo(page) {
+            // Update menu active state
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            event.target.closest('.menu-item').classList.add('active');
+
+            switch(page) {
+                case 'dashboard':
+                    showScreen('screen-dashboard');
+                    break;
+                case 'profile':
+                    loadProfile();
+                    showScreen('screen-profile');
+                    break;
+                case 'alerts':
+                    loadAlerts();
+                    showScreen('screen-alerts');
+                    break;
+                case 'nearby':
+                    loadNearby();
+                    showScreen('screen-nearby');
+                    break;
+                case 'settings':
+                    loadSettings();
+                    showScreen('screen-settings');
+                    break;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('rubisos_user');
+            currentUser = null;
+            if (socket) socket.disconnect();
+            showScreen('screen-register');
+            showToast('Logged out successfully', 'success');
+            closeMenu();
+        }
+
+        // Load profile data
+        function loadProfile() {
+            if (!currentUser) return;
+            document.getElementById('profileName').textContent = currentUser.name;
+            document.getElementById('profilePhone').textContent = currentUser.phone;
+            document.getElementById('profileNameInput').value = currentUser.name || '';
+            document.getElementById('profileEmailInput').value = currentUser.email || '';
+            document.getElementById('profileBloodType').value = currentUser.bloodType || '';
+            document.getElementById('menuUserName').textContent = currentUser.name;
+        }
+
+        // Save profile
+        async function saveProfile() {
+            if (!currentUser) return;
+
+            const updates = {
+                name: document.getElementById('profileNameInput').value,
+                email: document.getElementById('profileEmailInput').value,
+                bloodType: document.getElementById('profileBloodType').value,
+                medicalNotes: document.getElementById('profileMedicalNotes').value,
+                emergencyContact: {
+                    name: document.getElementById('profileEmergencyName').value,
+                    phone: document.getElementById('profileEmergencyPhone').value
+                }
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/users/profile`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: currentUser.phone, ...updates })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    currentUser = { ...currentUser, ...updates };
+                    localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
+                    showToast('Profile updated!', 'success');
+                    updateUserDisplay();
+                }
+            } catch (error) {
+                showToast('Failed to update profile', 'error');
+            }
+        }
+
+        // Load alerts
+        async function loadAlerts() {
+            if (!currentUser) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/alerts/user/${currentUser.phone}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('alertsList');
+                if (data.alerts && data.alerts.length > 0) {
+                    container.innerHTML = data.alerts.map(alert => `
+                        <div class="stat-card" style="margin-bottom: 10px; text-align: left;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-weight: 600;">${alert.type.toUpperCase()}</span>
+                                <span style="color: ${alert.status === 'active' ? '#44ff44' : '#888'};">${alert.status}</span>
+                            </div>
+                            <p style="color: #888; font-size: 12px;">${new Date(alert.createdAt).toLocaleString()}</p>
+                            <p style="margin-top: 5px;">${alert.location.address}</p>
+                            <p style="color: #ff4444; margin-top: 5px;">${alert.responderCount} responders</p>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="stat-card" style="text-align: center; padding: 40px;">
+                            <div style="font-size: 48px; margin-bottom: 10px;">📋</div>
+                            <p style="color: #888;">No alerts yet</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load alerts:', error);
+            }
+        }
+
+        // Load nearby users
+        async function loadNearby() {
+            if (!currentUser || !currentLocation) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/users/nearby?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radius=10`);
+                const data = await response.json();
+                
+                document.getElementById('nearbyOnline').textContent = data.count || 0;
+                
+                const container = document.getElementById('nearbyList');
+                if (data.users && data.users.length > 0) {
+                    container.innerHTML = data.users.map(user => `
+                        <div class="responder-item">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 24px;">👤</span>
+                                <div>
+                                    <div class="responder-name">${user.name}</div>
+                                    <div style="color: #888; font-size: 12px;">${user.distance} km away</div>
+                                </div>
+                            </div>
+                            <span style="color: #44ff44; font-size: 12px;">● Online</span>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No users nearby</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load nearby:', error);
+            }
+        }
+
+        // Load settings
+        function loadSettings() {
+            if (!currentUser) return;
+            document.getElementById('settingsRadius').value = currentUser.alertRadius || 10;
+            document.getElementById('radiusValue').textContent = (currentUser.alertRadius || 10) + ' km';
+            document.getElementById('settingsPush').checked = currentUser.pushEnabled !== false;
+            document.getElementById('settingsAvailable').checked = currentUser.canReceiveAlerts !== false;
+        }
+
+        // Save settings
+        async function saveSettings() {
+            if (!currentUser) return;
+
+            const settings = {
+                alertRadius: parseInt(document.getElementById('settingsRadius').value),
+                pushEnabled: document.getElementById('settingsPush').checked,
+                canReceiveAlerts: document.getElementById('settingsAvailable').checked,
+                alertTypes: Array.from(document.querySelectorAll('.alert-type-checkbox:checked')).map(cb => cb.value)
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/users/settings`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: currentUser.phone, ...settings })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    currentUser = { ...currentUser, ...settings };
+                    localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
+                    showToast('Settings saved!', 'success');
+                }
+            } catch (error) {
+                showToast('Failed to save settings', 'error');
+            }
         }
 
         function closeModal(modalId) {
