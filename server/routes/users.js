@@ -59,7 +59,10 @@ router.post('/register', async (req, res) => {
             name,
             dateOfBirth: new Date(dateOfBirth),
             homeAddress: {
-                ...homeAddress,
+                street: homeAddress.street,
+                city: homeAddress.city,
+                country: homeAddress.country || 'Israel',
+                zipCode: homeAddress.postcode || homeAddress.zipCode,
                 coordinates: {
                     lat: homeAddress.coordinates.lat,
                     lng: homeAddress.coordinates.lng

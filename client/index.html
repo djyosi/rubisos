@@ -635,9 +635,34 @@
             </div>
 
             <div class="form-group">
-                <label>Home Address *</label>
-                <input type="text" id="regStreet" placeholder="Street address" required>
+                <label>Postcode / ZIP Code *</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="regPostcode" placeholder="Enter postcode" required style="flex: 1;">
+                    <button type="button" class="btn btn-secondary" onclick="lookupAddress()" style="width: auto; padding: 15px 20px;">
+                        🔍 Find
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group" id="addressSelectGroup" style="display: none;">
+                <label>Select Address *</label>
+                <select id="regAddressSelect" required onchange="fillAddressDetails()">
+                    <option value="">Select your address...</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="manualAddressGroup" style="display: none;">
+                <label>Street Address *</label>
+                <input type="text" id="regStreet" placeholder="Street and number" required>
                 <input type="text" id="regCity" placeholder="City" required style="margin-top: 10px;">
+                <input type="text" id="regCountry" placeholder="Country" value="Israel" style="margin-top: 10px;">
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="manualAddressToggle" onchange="toggleManualAddress()" style="width: auto;">
+                    <span style="color: #888; font-size: 14px;">Enter address manually</span>
+                </label>
             </div>
 
             <div class="form-group">
@@ -1235,9 +1260,29 @@
             const phone = document.getElementById('regPhone').value.trim();
             const name = document.getElementById('regName').value.trim();
             const dateOfBirth = document.getElementById('regDOB').value;
-            const street = document.getElementById('regStreet').value.trim();
-            const city = document.getElementById('regCity').value.trim();
             const bloodType = document.getElementById('regBloodType').value;
+
+            // Get address details
+            let street, city, country, postcode;
+            const useManual = document.getElementById('manualAddressToggle').checked;
+            
+            if (useManual) {
+                street = document.getElementById('regStreet').value.trim();
+                city = document.getElementById('regCity').value.trim();
+                country = document.getElementById('regCountry').value.trim();
+                postcode = document.getElementById('regPostcode').value.trim();
+            } else {
+                const addressSelect = document.getElementById('regAddressSelect');
+                if (!addressSelect.value) {
+                    showToast('Please select an address', 'error');
+                    return;
+                }
+                const selectedAddress = JSON.parse(addressSelect.value);
+                street = selectedAddress.street;
+                city = selectedAddress.city;
+                country = selectedAddress.country;
+                postcode = document.getElementById('regPostcode').value.trim();
+            }
 
             // Validate phone format
             const phoneRegex = /^\+972[0-9]{9}$/;
@@ -1248,7 +1293,7 @@
 
             showToast('Creating account...', '');
 
-            // Get coordinates for address (simplified - should use geocoding API)
+            // Get coordinates for address
             const coordinates = await getAddressCoordinates(street, city);
 
             const userData = {
@@ -1258,6 +1303,8 @@
                 homeAddress: {
                     street,
                     city,
+                    country,
+                    postcode,
                     coordinates
                 },
                 bloodType
@@ -1297,6 +1344,106 @@
             } catch (error) {
                 console.error('Registration error:', error);
                 showToast('Network error. Please try again.', 'error');
+            }
+        }
+
+        // Address lookup functions
+        async function lookupAddress() {
+            const postcode = document.getElementById('regPostcode').value.trim();
+            
+            if (!postcode) {
+                showToast('Please enter a postcode', 'error');
+                return;
+            }
+
+            showToast('Looking up addresses...', '');
+
+            // In production, this would call an API like:
+            // - Google Places API
+            // - OpenStreetMap Nominatim
+            // - Local postal service API
+            // - Geoapify
+            // - PositionStack
+            
+            // For demo, simulate address lookup
+            setTimeout(() => {
+                const mockAddresses = generateMockAddresses(postcode);
+                
+                if (mockAddresses.length === 0) {
+                    showToast('No addresses found. Please enter manually.', 'error');
+                    document.getElementById('manualAddressToggle').checked = true;
+                    toggleManualAddress();
+                    return;
+                }
+
+                const select = document.getElementById('regAddressSelect');
+                select.innerHTML = '<option value="">Select your address...</option>';
+                
+                mockAddresses.forEach(addr => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(addr);
+                    option.textContent = `${addr.street}, ${addr.city}`;
+                    select.appendChild(option);
+                });
+
+                document.getElementById('addressSelectGroup').style.display = 'block';
+                showToast(`Found ${mockAddresses.length} addresses`, 'success');
+            }, 1000);
+        }
+
+        function generateMockAddresses(postcode) {
+            // Simulate finding addresses based on postcode
+            // In production, this comes from a real API
+            
+            const streetNames = ['Herzl', 'Ben Gurion', 'Rothschild', 'Dizengoff', 'Allenby', 'Bialik', 'Trumpeldor'];
+            const cities = ['Tel Aviv', 'Ramat Gan', 'Givatayim', 'Holon', 'Bat Yam', 'Jaffa'];
+            
+            // Generate 2-5 random addresses for demo
+            const count = Math.floor(Math.random() * 4) + 2;
+            const addresses = [];
+            
+            for (let i = 0; i < count; i++) {
+                const street = streetNames[Math.floor(Math.random() * streetNames.length)];
+                const number = Math.floor(Math.random() * 200) + 1;
+                const city = cities[Math.floor(Math.random() * cities.length)];
+                
+                addresses.push({
+                    street: `${street} St ${number}`,
+                    city: city,
+                    country: 'Israel',
+                    postcode: postcode
+                });
+            }
+            
+            return addresses;
+        }
+
+        function fillAddressDetails() {
+            const select = document.getElementById('regAddressSelect');
+            if (!select.value) return;
+            
+            const address = JSON.parse(select.value);
+            
+            // Show manual fields with selected values
+            document.getElementById('manualAddressGroup').style.display = 'block';
+            document.getElementById('regStreet').value = address.street;
+            document.getElementById('regCity').value = address.city;
+            document.getElementById('regCountry').value = address.country;
+        }
+
+        function toggleManualAddress() {
+            const isManual = document.getElementById('manualAddressToggle').checked;
+            
+            if (isManual) {
+                document.getElementById('addressSelectGroup').style.display = 'none';
+                document.getElementById('manualAddressGroup').style.display = 'block';
+            } else {
+                document.getElementById('manualAddressGroup').style.display = 'none';
+                // Only show address select if addresses have been looked up
+                const select = document.getElementById('regAddressSelect');
+                if (select.options.length > 1) {
+                    document.getElementById('addressSelectGroup').style.display = 'block';
+                }
             }
         }
 

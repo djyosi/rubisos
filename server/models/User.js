@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
         street: { type: String, required: true },
         city: { type: String, required: true },
         state: { type: String },
-        zipCode: { type: String },
+        zipCode: { type: String, required: true },
         country: { type: String, default: 'Israel' },
         coordinates: {
             lat: { type: Number, required: true },
