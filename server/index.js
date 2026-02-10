@@ -4,6 +4,19 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 
+// Services
+const connectDB = require('./services/database');
+const GeoService = require('./services/geolocation');
+const NotificationService = require('./services/notifications');
+
+// Models
+const User = require('./models/User');
+const Alert = require('./models/Alert');
+
+// Routes
+const userRoutes = require('./routes/users');
+const alertRoutes = require('./routes/alerts');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -15,215 +28,416 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../client')));
 
-// In-memory storage (replace with MongoDB in production)
-const users = new Map();
-const activeAlerts = new Map();
+// Connect to database
+connectDB();
 
-// Haversine formula for real distance calculation
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
+// API Routes
+app.use('/api/users', userRoutes);
+app.use('/api/alerts', alertRoutes);
 
-// Calculate ETA based on distance
-function calculateETA(distanceKm) {
-    const avgSpeedKmh = 15; // Average urban speed
-    const minutes = Math.round((distanceKm / avgSpeedKmh) * 60);
-    return Math.max(2, minutes); // Minimum 2 minutes
-}
+// In-memory storage for active socket connections (fallback if DB is down)
+const activeSockets = new Map();
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    console.log('🔌 User connected:', socket.id);
 
-    // User registration with GPS
-    socket.on('register', (data) => {
-        const { userId, name, phone, location } = data;
-        users.set(userId, {
-            socketId: socket.id,
-            userId,
-            name,
-            phone,
-            location,
-            status: 'online'
-        });
-        socket.userId = userId;
-        console.log(`User registered: ${name} at ${location.lat}, ${location.lng}`);
-        
-        // Send nearby helpers count
-        const nearbyCount = getNearbyHelpers(location).length;
-        socket.emit('registered', { nearbyCount });
+    // User registration with socket
+    socket.on('register', async (data) => {
+        try {
+            const { phone, name, location, fcmToken } = data;
+            
+            // Update user in database
+            const user = await User.findOneAndUpdate(
+                { phone },
+                {
+                    socketId: socket.id,
+                    isOnline: true,
+                    lastActive: new Date(),
+                    ...(location && { currentLocation: { ...location, timestamp: new Date() } }),
+                    ...(fcmToken && { fcmToken })
+                },
+                { new: true }
+            );
+
+            if (user) {
+                socket.userId = user._id.toString();
+                socket.userPhone = user.phone;
+                activeSockets.set(user._id.toString(), socket.id);
+                
+                console.log(`✅ User registered: ${user.name} (${phone})`);
+                
+                // Send nearby helpers count
+                const nearbyQuery = GeoService.getNearbyQuery(location.lat, location.lng, user.alertRadius || 10);
+                nearbyQuery._id = { $ne: user._id };
+                nearbyQuery.isOnline = true;
+                const nearbyCount = await User.countDocuments(nearbyQuery);
+                
+                socket.emit('registered', { 
+                    success: true, 
+                    userId: user._id,
+                    nearbyCount 
+                });
+            } else {
+                socket.emit('registered', { 
+                    success: false, 
+                    error: 'User not found. Please register first.' 
+                });
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            socket.emit('registered', { success: false, error: error.message });
+        }
     });
 
     // Update location in real-time
-    socket.on('update-location', (data) => {
-        const user = users.get(socket.userId);
-        if (user) {
-            user.location = data.location;
-            console.log(`Location updated for ${user.name}: ${data.location.lat}, ${data.location.lng}`);
+    socket.on('update-location', async (data) => {
+        try {
+            if (socket.userId) {
+                await User.findByIdAndUpdate(socket.userId, {
+                    'currentLocation': { ...data.location, timestamp: new Date() },
+                    lastActive: new Date()
+                });
+                
+                console.log(`📍 Location updated for ${socket.userPhone}`);
+            }
+        } catch (error) {
+            console.error('Location update error:', error);
         }
     });
 
-    // Send SOS alert
-    socket.on('send-sos', (data) => {
-        const sender = users.get(socket.userId);
-        if (!sender) return;
+    // Send SOS alert via Socket.io (real-time)
+    socket.on('send-sos', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('alert-error', { error: 'Not registered' });
+                return;
+            }
 
-        const alertId = Date.now().toString();
-        const alert = {
-            id: alertId,
-            senderId: socket.userId,
-            senderName: sender.name,
-            senderPhone: sender.phone,
-            location: data.location,
-            emergencyType: data.emergencyType,
-            timestamp: new Date(),
-            status: 'active',
-            responders: []
-        };
+            const sender = await User.findById(socket.userId);
+            if (!sender) return;
 
-        activeAlerts.set(alertId, alert);
-
-        // Find nearby helpers within 10km
-        const nearbyHelpers = getNearbyHelpers(data.location, 10);
-        
-        console.log(`SOS from ${sender.name}! Notifying ${nearbyHelpers.length} nearby helpers`);
-
-        // Send alert to nearby helpers
-        nearbyHelpers.forEach(helper => {
-            const distance = calculateDistance(
-                data.location.lat, data.location.lng,
-                helper.location.lat, helper.location.lng
-            );
-            const eta = calculateETA(distance);
-
-            io.to(helper.socketId).emit('incoming-alert', {
-                alertId,
+            // Create alert in DB
+            const { v4: uuidv4 } = require('uuid');
+            const alert = new Alert({
+                alertId: uuidv4(),
+                type: data.type || 'other',
+                priority: data.type === 'medical' ? 'critical' : 'high',
+                senderId: sender._id,
                 senderName: sender.name,
                 senderPhone: sender.phone,
-                location: data.location,
-                address: data.address || 'Unknown location',
-                distance: distance.toFixed(1),
-                eta: eta,
-                emergencyType: data.emergencyType,
-                timestamp: alert.timestamp
+                location: {
+                    lat: data.location.lat,
+                    lng: data.location.lng,
+                    address: data.address || 'Unknown location'
+                },
+                description: data.description,
+                expiresAt: new Date(Date.now() + 60 * 60 * 1000)
             });
-        });
 
-        socket.emit('alert-sent', {
-            alertId,
-            helpersNotified: nearbyHelpers.length
-        });
+            // Find nearby users
+            const nearbyQuery = GeoService.getNearbyQuery(
+                data.location.lat, 
+                data.location.lng, 
+                sender.alertRadius || 10
+            );
+            nearbyQuery._id = { $ne: sender._id };
+            nearbyQuery.isOnline = true;
+            nearbyQuery.canReceiveAlerts = true;
+
+            const nearbyUsers = await User.find(nearbyQuery);
+
+            // Send real-time alerts via socket.io
+            let notifiedCount = 0;
+            for (const user of nearbyUsers) {
+                const distance = GeoService.calculateDistance(
+                    data.location.lat, data.location.lng,
+                    user.currentLocation?.lat || 0, user.currentLocation?.lng || 0
+                );
+                const eta = GeoService.calculateETA(distance);
+
+                // Send to user's socket if online
+                if (user.socketId) {
+                    io.to(user.socketId).emit('incoming-alert', {
+                        alertId: alert.alertId,
+                        senderId: sender._id,
+                        senderName: sender.name,
+                        senderPhone: sender.phone,
+                        location: data.location,
+                        address: data.address || 'Unknown location',
+                        distance: distance.toFixed(1),
+                        eta: eta.formatted,
+                        emergencyType: data.type || 'emergency',
+                        timestamp: new Date(),
+                        priority: alert.priority
+                    });
+                    notifiedCount++;
+                }
+
+                // Record recipient
+                alert.recipients.push({
+                    userId: user._id,
+                    notifiedAt: new Date(),
+                    notificationMethod: user.socketId ? 'socket' : 'push'
+                });
+            }
+
+            // Send push notifications to those not online via socket
+            const offlineUsers = nearbyUsers.filter(u => !u.socketId && u.fcmToken);
+            if (offlineUsers.length > 0) {
+                await NotificationService.sendMulticast(
+                    offlineUsers,
+                    '🆘 SOS ALERT!',
+                    `${sender.name} needs help!`,
+                    { alertId: alert.alertId, type: 'sos' }
+                );
+            }
+
+            alert.totalNotified = nearbyUsers.length;
+            await alert.save();
+
+            // Update sender stats
+            sender.alertsSent += 1;
+            await sender.save();
+
+            socket.emit('alert-sent', {
+                success: true,
+                alertId: alert.alertId,
+                helpersNotified: nearbyUsers.length,
+                onlineNotified: notifiedCount
+            });
+
+            console.log(`🚨 SOS from ${sender.name}! Notified ${nearbyUsers.length} nearby users`);
+
+        } catch (error) {
+            console.error('Send SOS error:', error);
+            socket.emit('alert-error', { error: error.message });
+        }
     });
 
     // Responder accepts alert
-    socket.on('respond-to-alert', (data) => {
-        const responder = users.get(socket.userId);
-        const alert = activeAlerts.get(data.alertId);
-        
-        if (!alert || !responder) return;
+    socket.on('respond-to-alert', async (data) => {
+        try {
+            const { alertId } = data;
+            const responder = await User.findById(socket.userId);
+            const alert = await Alert.findOne({ alertId });
 
-        // Calculate real-time distance and ETA
-        const distance = calculateDistance(
-            responder.location.lat, responder.location.lng,
-            alert.location.lat, alert.location.lng
-        );
-        const eta = calculateETA(distance);
+            if (!alert || !responder) return;
 
-        alert.responders.push({
-            userId: socket.userId,
-            name: responder.name,
-            eta: eta,
-            timestamp: new Date()
-        });
+            // Calculate distance and ETA
+            const distance = GeoService.calculateDistance(
+                responder.currentLocation?.lat || 0, responder.currentLocation?.lng || 0,
+                alert.location.lat, alert.location.lng
+            );
+            const eta = GeoService.calculateETA(distance);
 
-        // Notify sender that help is coming
-        const sender = users.get(alert.senderId);
-        if (sender) {
-            io.to(sender.socketId).emit('help-coming', {
-                responderName: responder.name,
-                eta: eta,
-                distance: distance.toFixed(1)
+            // Add responder to alert
+            alert.responders.push({
+                userId: responder._id,
+                name: responder.name,
+                phone: responder.phone,
+                distance: distance,
+                eta: eta.minutes,
+                location: responder.currentLocation,
+                status: 'coming'
             });
-        }
+            await alert.save();
 
-        // Send navigation data to responder
-        socket.emit('navigation-data', {
-            destination: alert.location,
-            eta: eta,
-            wazeUrl: `waze://?ll=${alert.location.lat},${alert.location.lng}&navigate=yes`,
-            googleMapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${alert.location.lat},${alert.location.lng}`,
-            appleMapsUrl: `http://maps.apple.com/?daddr=${alert.location.lat},${alert.location.lng}&dirflg=d`
-        });
+            // Update responder stats
+            responder.alertsResponded += 1;
+            await responder.save();
+
+            // Notify sender
+            const sender = await User.findById(alert.senderId);
+            if (sender) {
+                // Socket notification
+                if (sender.socketId) {
+                    io.to(sender.socketId).emit('help-coming', {
+                        alertId: alert.alertId,
+                        responderName: responder.name,
+                        responderPhone: responder.phone,
+                        eta: eta.formatted,
+                        distance: distance.toFixed(1)
+                    });
+                }
+                
+                // Push notification
+                if (sender.fcmToken) {
+                    await NotificationService.sendPushNotification(
+                        sender.fcmToken,
+                        '✅ Help is coming!',
+                        `${responder.name} is on the way (ETA: ${eta.formatted})`,
+                        { alertId, type: 'responder_update' }
+                    );
+                }
+            }
+
+            // Send navigation data to responder
+            const navUrls = GeoService.getNavigationUrls(
+                alert.location.lat, 
+                alert.location.lng, 
+                alert.location.address
+            );
+
+            socket.emit('navigation-data', {
+                alertId: alert.alertId,
+                destination: alert.location,
+                eta: eta,
+                distance: distance.toFixed(1),
+                ...navUrls
+            });
+
+            console.log(`🚗 ${responder.name} is responding to alert ${alertId}`);
+
+        } catch (error) {
+            console.error('Respond error:', error);
+            socket.emit('response-error', { error: error.message });
+        }
+    });
+
+    // Mark as arrived
+    socket.on('mark-arrived', async (data) => {
+        try {
+            const { alertId } = data;
+            const responder = await User.findById(socket.userId);
+            const alert = await Alert.findOne({ alertId });
+
+            if (!alert || !responder) return;
+
+            const responderEntry = alert.responders.find(
+                r => r.userId.toString() === responder._id.toString()
+            );
+
+            if (responderEntry) {
+                responderEntry.status = 'arrived';
+                responderEntry.arrivedAt = new Date();
+                await alert.save();
+
+                // Notify sender
+                const sender = await User.findById(alert.senderId);
+                if (sender) {
+                    if (sender.socketId) {
+                        io.to(sender.socketId).emit('responder-arrived', {
+                            alertId,
+                            responderName: responder.name
+                        });
+                    }
+                    
+                    if (sender.fcmToken) {
+                        await NotificationService.sendPushNotification(
+                            sender.fcmToken,
+                            '🎉 Help arrived!',
+                            `${responder.name} has arrived`,
+                            { alertId, type: 'responder_arrived' }
+                        );
+                    }
+                }
+
+                socket.emit('arrived-confirmed', { alertId });
+                console.log(`🎉 ${responder.name} arrived at alert ${alertId}`);
+            }
+        } catch (error) {
+            console.error('Mark arrived error:', error);
+        }
     });
 
     // Cancel alert
-    socket.on('cancel-alert', (data) => {
-        const alert = activeAlerts.get(data.alertId);
-        if (alert) {
+    socket.on('cancel-alert', async (data) => {
+        try {
+            const { alertId } = data;
+            const user = await User.findById(socket.userId);
+            const alert = await Alert.findOne({ alertId });
+
+            if (!alert || alert.senderId.toString() !== socket.userId) return;
+
             alert.status = 'cancelled';
-            
+            await alert.save();
+
             // Notify all responders
-            alert.responders.forEach(responder => {
-                const user = users.get(responder.userId);
-                if (user) {
-                    io.to(user.socketId).emit('alert-cancelled', {
-                        alertId: data.alertId
-                    });
+            for (const responder of alert.responders) {
+                const responderUser = await User.findById(responder.userId);
+                if (responderUser?.socketId) {
+                    io.to(responderUser.socketId).emit('alert-cancelled', { alertId });
                 }
-            });
-            
-            activeAlerts.delete(data.alertId);
+                if (responderUser?.fcmToken) {
+                    await NotificationService.sendPushNotification(
+                        responderUser.fcmToken,
+                        '❌ Alert Cancelled',
+                        'The emergency has been cancelled',
+                        { alertId, type: 'alert_cancelled' }
+                    );
+                }
+            }
+
+            socket.emit('alert-cancelled-confirmed', { alertId });
+            console.log(`❌ Alert ${alertId} cancelled by ${user?.name}`);
+
+        } catch (error) {
+            console.error('Cancel alert error:', error);
         }
     });
 
     // Disconnect handling
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
+        console.log('🔌 User disconnected:', socket.id);
+        
         if (socket.userId) {
-            const user = users.get(socket.userId);
-            if (user) {
-                user.status = 'offline';
-                console.log(`User disconnected: ${user.name}`);
+            try {
+                await User.findByIdAndUpdate(socket.userId, {
+                    isOnline: false,
+                    socketId: null,
+                    lastActive: new Date()
+                });
+                activeSockets.delete(socket.userId);
+            } catch (error) {
+                console.error('Disconnect update error:', error);
             }
         }
     });
 });
 
-// Helper function to find nearby users
-function getNearbyHelpers(location, maxDistanceKm = 10) {
-    const helpers = [];
-    users.forEach((user, userId) => {
-        if (user.status === 'online') {
-            const distance = calculateDistance(
-                location.lat, location.lng,
-                user.location.lat, user.location.lng
-            );
-            if (distance <= maxDistanceKm) {
-                helpers.push(user);
-            }
-        }
-    });
-    return helpers;
-}
-
-// REST API endpoints
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', onlineUsers: users.size, activeAlerts: activeAlerts.size });
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+    try {
+        const onlineUsers = await User.countDocuments({ isOnline: true });
+        const activeAlerts = await Alert.countDocuments({ status: 'active' });
+        
+        res.json({ 
+            status: 'ok', 
+            timestamp: new Date(),
+            onlineUsers,
+            activeAlerts,
+            mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+        });
+    } catch (error) {
+        res.json({ status: 'ok', error: error.message });
+    }
 });
 
-app.get('/api/nearby', (req, res) => {
-    const { lat, lng, radius = 10 } = req.query;
-    const nearby = getNearbyHelpers({ lat: parseFloat(lat), lng: parseFloat(lng) }, parseFloat(radius));
-    res.json({ count: nearby.length, users: nearby.map(u => ({ name: u.name, status: u.status })) });
+// Get online users count (for dashboard)
+app.get('/api/stats', async (req, res) => {
+    try {
+        const stats = await Promise.all([
+            User.countDocuments(),
+            User.countDocuments({ isOnline: true }),
+            Alert.countDocuments(),
+            Alert.countDocuments({ status: 'active' }),
+            Alert.countDocuments({ status: 'resolved' })
+        ]);
+
+        res.json({
+            totalUsers: stats[0],
+            onlineUsers: stats[1],
+            totalAlerts: stats[2],
+            activeAlerts: stats[3],
+            resolvedAlerts: stats[4]
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Serve main HTML
@@ -231,8 +445,27 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
+// Error handling
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ success: false, error: 'Something went wrong!' });
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🆘 rubiSOS Server running on port ${PORT}`);
-    console.log(`📱 Local: http://localhost:${PORT}`);
+    console.log('🆘 ╔══════════════════════════════════════╗');
+    console.log('🆘 ║     rubiSOS Server Running!          ║');
+    console.log('🆘 ╠══════════════════════════════════════╣');
+    console.log(`🆘 ║  Port: ${PORT}                          ║`);
+    console.log(`🆘 ║  Local: http://localhost:${PORT}        ║`);
+    console.log('🆘 ╚══════════════════════════════════════╝');
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
 });

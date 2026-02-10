@@ -4,38 +4,420 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a1a">
     <title>rubiSOS - Emergency Response</title>
-    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* Screens */
+        .screen {
+            display: none;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .screen.active { display: block; }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .logo {
+            font-size: 80px;
+            margin-bottom: 10px;
+        }
+        .app-title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(45deg, #ff4444, #ff6666);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tagline {
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #333;
+            border-radius: 12px;
+            background: #222;
+            color: #fff;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #ff4444;
+        }
+        
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #ff4444, #ff6666);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 68, 68, 0.4);
+        }
+        .btn-secondary {
+            background: #333;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #444;
+        }
+        .btn-success {
+            background: linear-gradient(45deg, #44ff44, #66ff66);
+            color: #000;
+        }
+        .btn-danger {
+            background: #ff4444;
+            color: #fff;
+        }
+        
+        /* Connection Status */
+        .connection-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 10px;
+            background: #ff4444;
+            text-align: center;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+        }
+        .connection-bar.connected {
+            background: #44ff44;
+            color: #000;
+        }
+        
+        /* SOS Button */
+        .sos-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .sos-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #ff4444, #cc0000);
+            border: 8px solid #ff6666;
+            font-size: 48px;
+            font-weight: 700;
+            color: #fff;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+            box-shadow: 0 20px 60px rgba(255, 68, 68, 0.5);
+            margin: 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 20px 60px rgba(255, 68, 68, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 30px 80px rgba(255, 68, 68, 0.7); }
+            100% { transform: scale(1); box-shadow: 0 20px 60px rgba(255, 68, 68, 0.5); }
+        }
+        
+        /* Alert Types */
+        .alert-types {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .alert-type-btn {
+            padding: 20px;
+            border: 2px solid #333;
+            border-radius: 12px;
+            background: #222;
+            color: #fff;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .alert-type-btn:hover,
+        .alert-type-btn.selected {
+            border-color: #ff4444;
+            background: #ff444422;
+        }
+        .alert-type-btn .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        /* Incoming Alert Modal */
+        .alert-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .alert-modal.active { display: flex; }
+        .alert-content {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 100%;
+            border: 2px solid #ff4444;
+            animation: slideIn 0.3s;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .alert-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .alert-icon {
+            font-size: 80px;
+            animation: flash 1s infinite;
+        }
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .alert-title {
+            font-size: 28px;
+            color: #ff4444;
+            margin-top: 10px;
+        }
+        .alert-details {
+            background: #222;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .detail-row:last-child { margin-bottom: 0; }
+        .detail-label { color: #888; }
+        .detail-value { color: #fff; font-weight: 600; }
+        
+        /* Dashboard */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #222;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .user-info h2 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #44ff44;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: #44ff44;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #222;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ff4444;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Navigation Links */
+        .nav-links {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .nav-link {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            background: #222;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #fff;
+            transition: background 0.3s;
+        }
+        .nav-link:hover {
+            background: #333;
+        }
+        .nav-link .icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .nav-link .label {
+            font-size: 12px;
+        }
+        
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 3000;
+            display: none;
+            animation: fadeInUp 0.3s;
+        }
+        .toast.show { display: block; }
+        .toast.success { background: #44ff44; color: #000; }
+        .toast.error { background: #ff4444; }
+        @keyframes fadeInUp {
+            from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        /* Responders List */
+        .responders-list {
+            background: #222;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .responder-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .responder-item:last-child { border-bottom: none; }
+        .responder-name { font-weight: 600; }
+        .responder-eta {
+            background: #44ff44;
+            color: #000;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
-    <!-- CONNECTION STATUS -->
+    <!-- Connection Status -->
     <div class="connection-bar" id="connectionBar">
-        <span class="status-dot" id="statusDot"></span>
         <span id="connectionText">Connecting...</span>
     </div>
 
-    <!-- USER REGISTRATION -->
-    <div class="screen active" id="screen-register">
-        <div class="logo-section">
+    <!-- SCREEN 1: Registration -->
+    <div class="screen" id="screen-register">
+        <div class="header">
             <div class="logo">🆘</div>
-            <h1>rubiSOS</h1>
+            <h1 class="app-title">rubiSOS</h1>
             <p class="tagline">Emergency response network</p>
         </div>
-        
-        <div class="form-section">
-            <div class="input-group">
-                <label>Your Name</label>
-                <input type="text" id="userName" placeholder="Enter your name" value="">
-            </div>
-            
-            <div class="input-group">
+
+        <form id="registerForm">
+            <div class="form-group">
                 <label>Phone Number</label>
-                <input type="tel" id="userPhone" placeholder="+44..." value="">
+                <input type="tel" id="regPhone" placeholder="+972501234567" required>
             </div>
-            
-            <div class="input-group">
+
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="regName" placeholder="Your full name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" id="regDOB" required>
+            </div>
+
+            <div class="form-group">
+                <label>Home Address</label>
+                <input type="text" id="regStreet" placeholder="Street address" required>
+                <input type="text" id="regCity" placeholder="City" required style="margin-top: 10px;">
+            </div>
+
+            <div class="form-group">
                 <label>Blood Type (optional)</label>
-                <select id="bloodType">
+                <select id="regBloodType">
                     <option value="">Not specified</option>
                     <option value="A+">A+</option>
                     <option value="A-">A-</option>
@@ -47,190 +429,527 @@
                     <option value="O-">O-</option>
                 </select>
             </div>
-            
-            <div class="location-status" id="locationStatus">
-                <span class="loc-dot"></span>
-                <span id="locText">Getting GPS location...</span>
+
+            <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+    </div>
+
+    <!-- SCREEN 2: Main Dashboard -->
+    <div class="screen" id="screen-dashboard">
+        <div class="dashboard-header">
+            <div class="user-info">
+                <h2 id="userNameDisplay">Welcome</h2>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="nearbyCount">0 helpers nearby</span>
+                </div>
             </div>
-            
-            <button class="btn-primary" id="registerBtn" onclick="registerUser()">
-                Join Network
-            </button>
-            
-            <p class="privacy-note">
-                Your location is only shared during active emergencies
-            </p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="statAlerts">0</div>
+                <div class="stat-label">Active Alerts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statResponded">0</div>
+                <div class="stat-label">Helped Others</div>
+            </div>
+        </div>
+
+        <div class="sos-container">
+            <p style="color: #888; margin-bottom: 20px;">Tap button in case of emergency</p>
+            <button class="sos-button" id="sosBtn">SOS</button>
+        </div>
+
+        <div id="activeAlertSection" style="display: none;">
+            <h3 style="margin: 20px 0 10px;">Your Active Alert</h3>
+            <div class="responders-list" id="respondersList">
+                <!-- Responders will be added here -->
+            </div>
+            <button class="btn btn-secondary" id="cancelAlertBtn" style="margin-top: 10px;">Cancel Alert</button>
         </div>
     </div>
 
-    <!-- MAIN APP (SENDER) -->
-    <div class="screen" id="screen-main">
+    <!-- SCREEN 3: Send Alert (Type Selection) -->
+    <div class="screen" id="screen-send-alert">
         <div class="header">
-            <div class="user-pill">
-                <div class="avatar" id="userAvatar">👤</div>
-                <span id="displayName">User</span>
+            <h1>Send Emergency Alert</h1>
+            <p class="tagline">Select emergency type</p>
+        </div>
+
+        <div class="alert-types">
+            <div class="alert-type-btn" data-type="medical">
+                <div class="icon">🏥</div>
+                <div>Medical</div>
             </div>
-            <div class="nearby-count">
-                <span id="nearbyBadge">0 nearby</span>
+            <div class="alert-type-btn" data-type="fire">
+                <div class="icon">🔥</div>
+                <div>Fire</div>
+            </div>
+            <div class="alert-type-btn" data-type="security">
+                <div class="icon">🛡️</div>
+                <div>Security</div>
+            </div>
+            <div class="alert-type-btn" data-type="accident">
+                <div class="icon">🚗</div>
+                <div>Accident</div>
             </div>
         </div>
-        
-        <div class="emergency-selector">
-            <p class="selector-label">Select Emergency Type:</p>
-            <div class="emergency-types">
-                <button class="type-btn selected" data-type="medical" onclick="selectEmergency('medical')">
-                    <span class="type-icon">🚑</span>
-                    <span>Medical</span>
-                </button>
-                
-                <button class="type-btn" data-type="crime" onclick="selectEmergency('crime')">
-                    <span class="type-icon">🦹</span>
-                    <span>Crime</span>
-                </button>
-                
-                <button class="type-btn" data-type="fire" onclick="selectEmergency('fire')">
-                    <span class="type-icon">🔥</span>
-                    <span>Fire</span>
-                </button>
-                
-                <button class="type-btn" data-type="other" onclick="selectEmergency('other')">
-                    <span class="type-icon">⚠️</span>
-                    <span>Other</span>
-                </button>
-            </div>
+
+        <div class="form-group">
+            <label>Additional Details (optional)</label>
+            <textarea id="alertDescription" rows="4" placeholder="Describe the situation..."></textarea>
         </div>
-        
-        <div class="sos-section">
-            <button class="sos-button" id="sosBtn" ontouchstart="startSOS(event)" ontouchend="endSOS()" onmousedown="startSOS(event)" onmouseup="endSOS()">
-                <span class="sos-text">SOS</span>
-                <span class="sos-hint">HOLD 3 SECONDS</span>
-            </button>
-            
-            <p class="sos-info">
-                Press and hold to alert nearby helpers
+
+        <button class="btn btn-primary" id="sendAlertConfirm">🚨 SEND ALERT</button>
+        <button class="btn btn-secondary" onclick="showScreen('screen-dashboard')">Cancel</button>
+    </div>
+
+    <!-- INCOMING ALERT MODAL -->
+    <div class="alert-modal" id="incomingAlertModal">
+        <div class="alert-content">
+            <div class="alert-header">
+                <div class="alert-icon">🚨</div>
+                <h2 class="alert-title">SOS ALERT!</h2>
+            </div>
+
+            <div class="alert-details">
+                <div class="detail-row">
+                    <span class="detail-label">From:</span>
+                    <span class="detail-value" id="alertSender">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value" id="alertType">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Distance:</span>
+                    <span class="detail-value" id="alertDistance">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">ETA:</span>
+                    <span class="detail-value" id="alertETA">--</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Location:</span>
+                    <span class="detail-value" id="alertLocation">--</span>
+                </div>
+            </div>
+
+            <button class="btn btn-success" id="acceptAlertBtn">✅ I'm Coming!</button>
+            <button class="btn btn-secondary" id="declineAlertBtn">❌ Can't Help</button>
+        </div>
+    </div>
+
+    <!-- NAVIGATION MODAL -->
+    <div class="alert-modal" id="navigationModal">
+        <div class="alert-content">
+            <div class="alert-header">
+                <div class="alert-icon">🚗</div>
+                <h2>Navigation</h2>
+            </div>
+
+            <p style="text-align: center; margin-bottom: 20px;">
+                Distance: <strong id="navDistance">--</strong> | 
+                ETA: <strong id="navETA">--</strong>
             </p>
-        </div>
-        
-        <button class="btn-secondary" onclick="logout()">
-            Log Out
-        </button>
-    </div>
 
-    <!-- WAITING FOR RESPONSE -->
-    <div class="screen" id="screen-waiting">
-        <div class="waiting-content">
-            <div class="pulse-ring">
-                <div class="pulse-dot">📡</div>
+            <div class="nav-links">
+                <a href="#" class="nav-link" id="wazeLink" target="_blank">
+                    <span class="icon">🗺️</span>
+                    <span class="label">Waze</span>
+                </a>
+                <a href="#" class="nav-link" id="googleLink" target="_blank">
+                    <span class="icon">🌐</span>
+                    <span class="label">Google</span>
+                </a>
+                <a href="#" class="nav-link" id="appleLink" target="_blank">
+                    <span class="icon">🍎</span>
+                    <span class="label">Apple</span>
+                </a>
             </div>
-            
-            <h2>Alert Sent!</h2>
-            <p class="waiting-text">Notifying nearby helpers...</p>
-            
-            <div id="responseStatus">
-                <p class="status-message">⏳ Waiting for someone to respond...</p>
-            </div>
-            
-            <button class="btn-danger" onclick="cancelAlert()">
-                Cancel Emergency
-            </button>
+
+            <button class="btn btn-success" id="markArrivedBtn" style="margin-top: 20px;">✅ I've Arrived</button>
+            <button class="btn btn-secondary" onclick="closeModal('navigationModal')">Close</button>
         </div>
     </div>
 
-    <!-- HELP IS COMING -->
-    <div class="screen" id="screen-help-coming">
-        <div class="success-content">
-            <div class="success-icon">✅</div>
-            
-            <h2>Help is on the way!</h2>
-            
-            <div class="responder-card">
-                <div class="responder-name" id="responderName">Someone</div>
-                <div class="responder-eta" id="responderETA">8 min</div>
-                <p>estimated arrival time</p>
-            </div>
-            
-            <button class="btn-secondary" onclick="backToMain()">
-                Back to Main
-            </button>
-        </div>
-    </div>
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
 
-    <!-- INCOMING ALERT (RECEIVER) -->
-    <div class="alert-overlay" id="alertOverlay">
-        <div class="alert-header">
-            <div class="alert-icon">🆘</div>
-            <h1>EMERGENCY!</h1>
-            <div class="alert-type-badge" id="overlayEmergencyType">🚑 Medical</div>
-        </div>
-        
-        <div class="alert-info">
-            <div class="sender-card">
-                <div class="sender-avatar">👤</div>
-                <div class="sender-details">
-                    <div class="sender-name" id="alertSenderName">Someone</div>
-                    <button class="call-btn" onclick="callSender()">📞 Call</button>
-                </div>
-            </div>
-            
-            <div class="info-grid">
-                <div class="info-item">
-                    <label>📍 Location</label>
-                    <value id="alertAddress">Unknown</value>
-                </div>
-                
-                <div class="info-item">
-                    <label>📏 Distance</label>
-                    <value class="highlight" id="alertDistance">0.0 km</value>
-                </div>
-                
-                <div class="info-item">
-                    <label>⏱️ Your ETA</label>
-                    <value class="highlight" id="alertETA">8 min</value>
-                </div>
-            </div>
-        </div>
-        
-        <div class="alert-actions">
-            <button class="btn-respond accept" onclick="acceptAlert()">
-                ✅ I'M COMING
-            </button>
-            
-            <button class="btn-respond decline" onclick="declineAlert()">
-                ❌ CAN'T HELP
-            </button>
-        </div>
-    </div>
+    <script>
+        // Global state
+        let socket = null;
+        let currentUser = null;
+        let currentLocation = null;
+        let selectedAlertType = null;
+        let currentAlertId = null;
+        let incomingAlertData = null;
 
-    <!-- NAVIGATION SCREEN -->
-    <div class="screen" id="screen-navigation">
-        <div class="nav-content">
-            <div class="nav-icon">🗺️</div>
-            
-            <h2>Navigate to Emergency</h2>
-            
-            <p>ETA: <strong id="navETA">8 minutes</strong></p>
-            
-            <div class="nav-buttons">
-                <button class="btn-nav" onclick="openWaze()">
-                    <span>📍</span> Open in Waze
-                </button>
-                
-                <button class="btn-nav" onclick="openGoogleMaps()">
-                    <span>🗺️</span> Open in Google Maps
-                </button>
-                
-                <button class="btn-nav" onclick="openAppleMaps()">
-                    <span>🍎</span> Open in Apple Maps
-                </button>
-            </div>
-            
-            <button class="btn-secondary" onclick="backToMain()">
-                Back to Monitoring
-            </button>
-        </div>
-    </div>
+        const API_URL = window.location.origin;
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+
+        function initApp() {
+            // Check if user is already registered
+            const savedUser = localStorage.getItem('rubisos_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                connectSocket();
+                showScreen('screen-dashboard');
+                updateUserDisplay();
+            } else {
+                showScreen('screen-register');
+            }
+
+            setupEventListeners();
+            getCurrentLocation();
+        }
+
+        function setupEventListeners() {
+            // Registration form
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+
+            // SOS button
+            document.getElementById('sosBtn').addEventListener('click', () => {
+                showScreen('screen-send-alert');
+            });
+
+            // Alert type selection
+            document.querySelectorAll('.alert-type-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.alert-type-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedAlertType = btn.dataset.type;
+                });
+            });
+
+            // Send alert
+            document.getElementById('sendAlertConfirm').addEventListener('click', handleSendAlert);
+
+            // Accept/Decline alert
+            document.getElementById('acceptAlertBtn').addEventListener('click', handleAcceptAlert);
+            document.getElementById('declineAlertBtn').addEventListener('click', () => {
+                closeModal('incomingAlertModal');
+            });
+
+            // Cancel alert
+            document.getElementById('cancelAlertBtn').addEventListener('click', handleCancelAlert);
+
+            // Mark arrived
+            document.getElementById('markArrivedBtn').addEventListener('click', handleMarkArrived);
+        }
+
+        // Connect to Socket.io
+        function connectSocket() {
+            socket = io(API_URL);
+
+            socket.on('connect', () => {
+                showToast('Connected to emergency network', 'success');
+                document.getElementById('connectionBar').classList.add('connected');
+                document.getElementById('connectionText').textContent = 'Connected';
+
+                // Register with server
+                if (currentUser && currentLocation) {
+                    socket.emit('register', {
+                        phone: currentUser.phone,
+                        name: currentUser.name,
+                        location: currentLocation
+                    });
+                }
+            });
+
+            socket.on('disconnect', () => {
+                showToast('Disconnected from network', 'error');
+                document.getElementById('connectionBar').classList.remove('connected');
+            });
+
+            socket.on('registered', (data) => {
+                if (data.success) {
+                    document.getElementById('nearbyCount').textContent = `${data.nearbyCount} helpers nearby`;
+                }
+            });
+
+            // Incoming alert
+            socket.on('incoming-alert', (data) => {
+                incomingAlertData = data;
+                showIncomingAlert(data);
+            });
+
+            // Help is coming
+            socket.on('help-coming', (data) => {
+                showToast(`${data.responderName} is coming! ETA: ${data.eta}`, 'success');
+                addResponderToList(data);
+            });
+
+            // Navigation data
+            socket.on('navigation-data', (data) => {
+                showNavigation(data);
+            });
+
+            // Responder arrived
+            socket.on('responder-arrived', (data) => {
+                showToast(`${data.responderName} has arrived!`, 'success');
+            });
+
+            // Alert cancelled
+            socket.on('alert-cancelled', () => {
+                showToast('Alert has been cancelled', 'error');
+                closeModal('incomingAlertModal');
+                closeModal('navigationModal');
+            });
+
+            // Location updates
+            setInterval(() => {
+                if (currentLocation && socket) {
+                    socket.emit('update-location', { location: currentLocation });
+                }
+            }, 30000); // Every 30 seconds
+        }
+
+        // Handle registration
+        async function handleRegister(e) {
+            e.preventDefault();
+
+            const phone = document.getElementById('regPhone').value;
+            const name = document.getElementById('regName').value;
+            const dateOfBirth = document.getElementById('regDOB').value;
+            const street = document.getElementById('regStreet').value;
+            const city = document.getElementById('regCity').value;
+            const bloodType = document.getElementById('regBloodType').value;
+
+            // Get coordinates for address (simplified - should use geocoding API)
+            const coordinates = await getAddressCoordinates(street, city);
+
+            const userData = {
+                phone,
+                name,
+                dateOfBirth,
+                homeAddress: {
+                    street,
+                    city,
+                    coordinates
+                },
+                bloodType
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/users/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUser = { phone, name, ...data.user };
+                    localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
+                    showToast('Registered successfully!', 'success');
+                    connectSocket();
+                    showScreen('screen-dashboard');
+                    updateUserDisplay();
+                } else {
+                    showToast(data.error || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showToast('Network error', 'error');
+            }
+        }
+
+        // Handle send alert
+        async function handleSendAlert() {
+            if (!selectedAlertType) {
+                showToast('Please select emergency type', 'error');
+                return;
+            }
+
+            if (!currentLocation) {
+                showToast('Getting your location...', 'error');
+                getCurrentLocation();
+                return;
+            }
+
+            const description = document.getElementById('alertDescription').value;
+
+            // Get address from coordinates
+            const address = await getAddressFromCoords(currentLocation.lat, currentLocation.lng);
+
+            socket.emit('send-sos', {
+                type: selectedAlertType,
+                location: currentLocation,
+                address,
+                description
+            });
+
+            currentAlertId = Date.now().toString();
+            document.getElementById('activeAlertSection').style.display = 'block';
+            document.getElementById('respondersList').innerHTML = '';
+
+            showToast('Alert sent! Notifying nearby users...', 'success');
+            showScreen('screen-dashboard');
+        }
+
+        // Handle accept alert
+        function handleAcceptAlert() {
+            if (!incomingAlertData) return;
+
+            socket.emit('respond-to-alert', {
+                alertId: incomingAlertData.alertId
+            });
+
+            closeModal('incomingAlertModal');
+            showToast('You are responding to the alert', 'success');
+        }
+
+        // Handle cancel alert
+        function handleCancelAlert() {
+            if (currentAlertId) {
+                socket.emit('cancel-alert', { alertId: currentAlertId });
+                document.getElementById('activeAlertSection').style.display = 'none';
+                showToast('Alert cancelled', 'success');
+            }
+        }
+
+        // Handle mark arrived
+        function handleMarkArrived() {
+            if (incomingAlertData) {
+                socket.emit('mark-arrived', { alertId: incomingAlertData.alertId });
+                closeModal('navigationModal');
+                showToast('Marked as arrived!', 'success');
+            }
+        }
+
+        // Show incoming alert modal
+        function showIncomingAlert(data) {
+            document.getElementById('alertSender').textContent = data.senderName;
+            document.getElementById('alertType').textContent = data.emergencyType.toUpperCase();
+            document.getElementById('alertDistance').textContent = data.distance + ' km';
+            document.getElementById('alertETA').textContent = data.eta;
+            document.getElementById('alertLocation').textContent = data.address;
+
+            document.getElementById('incomingAlertModal').classList.add('active');
+
+            // Play alert sound
+            playAlertSound();
+        }
+
+        // Show navigation modal
+        function showNavigation(data) {
+            document.getElementById('navDistance').textContent = data.distance + ' km';
+            document.getElementById('navETA').textContent = data.eta.formatted;
+
+            document.getElementById('wazeLink').href = data.wazeUrl;
+            document.getElementById('googleLink').href = data.googleMapsUrl;
+            document.getElementById('appleLink').href = data.appleMapsUrl;
+
+            document.getElementById('navigationModal').classList.add('active');
+        }
+
+        // Add responder to list
+        function addResponderToList(data) {
+            const list = document.getElementById('respondersList');
+            const item = document.createElement('div');
+            item.className = 'responder-item';
+            item.innerHTML = `
+                <span class="responder-name">${data.responderName}</span>
+                <span class="responder-eta">${data.eta}</span>
+            `;
+            list.appendChild(item);
+        }
+
+        // Helper functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function showToast(message, type = '') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function updateUserDisplay() {
+            if (currentUser) {
+                document.getElementById('userNameDisplay').textContent = `Welcome, ${currentUser.name}`;
+            }
+        }
+
+        // Geolocation
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        console.log('Location:', currentLocation);
+                    },
+                    (error) => {
+                        console.error('Location error:', error);
+                        showToast('Please enable location services', 'error');
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        }
+
+        // Get address coordinates (placeholder - use real geocoding API)
+        async function getAddressCoordinates(street, city) {
+            // In production, use Google Maps Geocoding API or similar
+            // For demo, return Tel Aviv coordinates
+            return { lat: 32.0853, lng: 34.7818 };
+        }
+
+        // Get address from coordinates (placeholder)
+        async function getAddressFromCoords(lat, lng) {
+            // In production, use reverse geocoding
+            return 'Current Location';
+        }
+
+        // Play alert sound
+        function playAlertSound() {
+            // Create audio context for SOS sound
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                gainNode.gain.value = 0.5;
+
+                oscillator.start();
+
+                // SOS pattern: ... --- ... (3 short, 3 long, 3 short)
+                const now = audioContext.currentTime;
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.setValueAtTime(0, now + 0.1);
+                gainNode.gain.setValueAtTime(0.5, now + 0.2);
+                gainNode.gain.setValueAtTime(0, now + 0.3);
+                gainNode.gain.setValueAtTime(0.5, now + 0.4);
+                gainNode.gain.setValueAtTime(0, now + 0.5);
+
+                oscillator.stop(now + 0.6);
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+    </script>
 </body>
 </html>
