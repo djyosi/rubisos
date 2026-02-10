@@ -533,9 +533,9 @@
         </div>
         
         <div class="menu-items">
-            <a class="menu-item active" onclick="navigateTo('dashboard')">
+            <a class="menu-item active" onclick="navigateTo('home')">
                 <span class="icon">🏠</span>
-                <span class="label">Dashboard</span>
+                <span class="label">Home</span>
             </a>
             <a class="menu-item" onclick="navigateTo('live-alerts')">
                 <span class="icon">🚨</span>
@@ -687,8 +687,8 @@
         </form>
     </div>
 
-    <!-- SCREEN 2: Main Dashboard -->
-    <div class="screen" id="screen-dashboard">
+    <!-- SCREEN 2: Home (with SOS button) -->
+    <div class="screen" id="screen-home">
         <div class="dashboard-header">
             <div class="user-info">
                 <h2 id="userNameDisplay">Welcome</h2>
@@ -756,7 +756,7 @@
         </div>
 
         <button class="btn btn-primary" id="sendAlertConfirm">🚨 SEND ALERT</button>
-        <button class="btn btn-secondary" onclick="showScreen('screen-dashboard')">Cancel</button>
+        <button class="btn btn-secondary" onclick="showScreen('screen-home')">Cancel</button>
     </div>
 
     <!-- SCREEN 4: Profile -->
@@ -814,7 +814,7 @@
         </div>
 
         <button class="btn btn-primary" onclick="saveProfile()">💾 Save Changes</button>
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')">Back</button>
     </div>
 
     <!-- SCREEN 5: Alert History -->
@@ -832,7 +832,7 @@
             </div>
         </div>
 
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 20px;">Back</button>
     </div>
 
     <!-- SCREEN 6: Live Alerts (Active alerts from past 1 hour) -->
@@ -861,7 +861,7 @@
             </div>
         </div>
 
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 20px;">Back</button>
     </div>
 
     <!-- SCREEN 7: Notification Center -->
@@ -885,7 +885,7 @@
         </div>
 
         <button class="btn btn-secondary" onclick="clearAllNotifications()" style="margin-top: 10px; background: #ff444422; color: #ff4444;">Clear All</button>
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 10px;">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 10px;">Back</button>
     </div>
 
     <!-- SCREEN 6: Nearby Helpers -->
@@ -910,7 +910,7 @@
             <p style="color: #888; text-align: center; padding: 20px;">Loading nearby users...</p>
         </div>
 
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 20px;">Back</button>
     </div>
 
     <!-- SCREEN 7: Settings -->
@@ -959,7 +959,7 @@
         </div>
 
         <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
-        <button class="btn btn-secondary" onclick="navigateTo('dashboard')">Back</button>
+        <button class="btn btn-secondary" onclick="navigateTo('home')">Back</button>
     </div>
 
     <!-- INCOMING ALERT MODAL -->
@@ -1060,7 +1060,7 @@
             if (savedUser && authToken) {
                 currentUser = JSON.parse(savedUser);
                 connectSocket();
-                showScreen('screen-dashboard');
+                showScreen('screen-home');
                 updateUserDisplay();
             } else {
                 // Clear any stale data
@@ -1234,7 +1234,7 @@
 
                     showToast('Login successful!', 'success');
                     connectSocket();
-                    showScreen('screen-dashboard');
+                    showScreen('screen-home');
                     updateUserDisplay();
                 } else {
                     if (data.error === 'User not found') {
@@ -1330,7 +1330,7 @@
 
                     showToast('Account created! Welcome!', 'success');
                     connectSocket();
-                    showScreen('screen-dashboard');
+                    showScreen('screen-home');
                     updateUserDisplay();
                 } else {
                     if (data.message && data.message.includes('already exists')) {
@@ -1477,7 +1477,7 @@
             document.getElementById('respondersList').innerHTML = '';
 
             showToast('Alert sent! Notifying nearby users...', 'success');
-            showScreen('screen-dashboard');
+            showScreen('screen-home');
         }
 
         // Handle accept alert
@@ -1573,8 +1573,8 @@
             event.target.closest('.menu-item').classList.add('active');
 
             switch(page) {
-                case 'dashboard':
-                    showScreen('screen-dashboard');
+                case 'home':
+                    showScreen('screen-home');
                     break;
                 case 'live-alerts':
                     loadLiveAlerts();
