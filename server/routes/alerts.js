@@ -381,4 +381,38 @@ router.get('/nearby', async (req, res) => {
     }
 });
 
+// Get ALL active alerts (system-wide)
+router.get('/all-active', async (req, res) => {
+    try {
+        // Get all active alerts from the system
+        const alerts = await Alert.find({ 
+            status: 'active',
+            expiresAt: { $gt: new Date() }
+        })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .select('alertId type status senderName senderPhone location description createdAt responders');
+
+        res.json({
+            success: true,
+            count: alerts.length,
+            alerts: alerts.map(a => ({
+                alertId: a.alertId,
+                type: a.type,
+                status: a.status,
+                senderName: a.senderName,
+                senderPhone: a.senderPhone,
+                location: a.location,
+                description: a.description,
+                createdAt: a.createdAt,
+                responderCount: a.responders ? a.responders.filter(r => r.status === 'coming' || r.status === 'arrived').length : 0,
+                responders: a.responders || []
+            }))
+        });
+    } catch (error) {
+        console.error('Get all active alerts error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#1a1a1a">
     <title>rubiSOS - Emergency Response</title>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="live-alerts.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -835,11 +836,11 @@
         <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 20px;">Back</button>
     </div>
 
-    <!-- SCREEN 6: Live Alerts (Active alerts from past 1 hour) -->
+    <!-- SCREEN 6: Live Alerts (All Active Incidents) -->
     <div class="screen" id="screen-live-alerts">
         <div class="header">
             <h1>🚨 Live Alerts</h1>
-            <p class="tagline">Active emergencies nearby (last 1 hour)</p>
+            <p class="tagline">All active emergencies in the system</p>
         </div>
 
         <div class="stats-grid" style="margin-bottom: 20px;">
@@ -849,19 +850,99 @@
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="liveTotalCount">0</div>
-                <div class="stat-label">Last Hour</div>
+                <div class="stat-label">All Alerts</div>
             </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="filterLiveAlerts('all')">All</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="filterLiveAlerts('active')">Active</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px; padding: 12px;" onclick="filterLiveAlerts('my-responses')">My Responses</button>
         </div>
 
         <div id="liveAlertsList">
             <div class="stat-card" style="text-align: center; padding: 40px;">
                 <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
-                <p style="color: #888;">No active alerts nearby</p>
+                <p style="color: #888;">No active alerts</p>
                 <p style="color: #666; font-size: 12px; margin-top: 10px;">You're all clear!</p>
             </div>
         </div>
 
         <button class="btn btn-secondary" onclick="navigateTo('home')" style="margin-top: 20px;">Back</button>
+    </div>
+
+    <!-- SCREEN 6b: Incident Detail -->
+    <div class="screen" id="screen-incident-detail">
+        <div class="header">
+            <h1>🚨 Incident Details</h1>
+            <p class="tagline" id="incidentDetailType">Emergency</p>
+        </div>
+
+        <div id="incidentDetailContent">
+            <!-- Incident details loaded here -->
+        </div>
+
+        <div id="incidentResponseSection" style="margin-top: 20px;">
+            <h3 style="margin-bottom: 15px; color: #ff4444;">Your Response</h3>
+            
+            <div id="incidentResponseButtons">
+                <button class="btn btn-success" onclick="respondToIncident('attending')" style="margin-bottom: 10px;">
+                    ✅ I'm Attending
+                </button>
+                <button class="btn btn-secondary" onclick="respondToIncident('decline')" style="background: #ff444422; color: #ff4444;">
+                    ❌ Can't Attend
+                </button>
+            </div>
+
+            <div id="incidentMyResponse" style="display: none;">
+                <div class="stat-card" style="background: #44ff4422; border: 2px solid #44ff44;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 32px;">✅</span>
+                        <div>
+                            <div style="font-weight: 600; color: #44ff44;">You are attending!</div>
+                            <div style="font-size: 14px; color: #888;" id="myResponseETA">ETA: 5 minutes</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
+                    <a href="#" id="detailWazeLink" target="_blank" class="btn btn-secondary" style="text-decoration: none; text-align: center;">
+                        🗺️ Waze
+                    </a>
+                    <a href="#" id="detailGoogleLink" target="_blank" class="btn btn-secondary" style="text-decoration: none; text-align: center;">
+                        🌐 Google Maps
+                    </a>
+                </div>
+
+                <button class="btn btn-success" onclick="markArrivedAtIncident()" style="margin-top: 15px;">
+                    📍 I've Arrived
+                </button>
+            </div>
+
+            <div id="incidentDeclined" style="display: none;">
+                <div class="stat-card" style="background: #ff444422; border: 2px solid #ff4444;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 32px;">❌</span>
+                        <div>
+                            <div style="font-weight: 600; color: #ff4444;">You declined</div>
+                            <div style="font-size: 14px; color: #888;">Thanks for checking</div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="changeResponse()" style="margin-top: 15px;">
+                    Change Response
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 15px; background: #222; border-radius: 12px;">
+            <h3 style="margin-bottom: 10px; font-size: 16px;">All Responders</h3>
+            <div id="incidentRespondersList">
+                <p style="color: #888; font-size: 14px;">No responders yet</p>
+            </div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="navigateTo('live-alerts')" style="margin-top: 20px;">← Back to Alerts</button>
     </div>
 
     <!-- SCREEN 7: Notification Center -->
@@ -1049,6 +1130,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            loadSavedResponses();
             initApp();
         });
 
