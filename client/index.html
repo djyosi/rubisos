@@ -537,18 +537,27 @@
                 <span class="icon">🏠</span>
                 <span class="label">Dashboard</span>
             </a>
+            <a class="menu-item" onclick="navigateTo('live-alerts')">
+                <span class="icon">🚨</span>
+                <span class="label">Live Alerts</span>
+                <span class="badge" id="liveAlertBadge" style="display: none;">0</span>
+            </a>
+            <a class="menu-item" onclick="navigateTo('notifications')">
+                <span class="icon">🔔</span>
+                <span class="label">Notifications</span>
+                <span class="badge" id="notificationBadge" style="display: none;">0</span>
+            </a>
             <a class="menu-item" onclick="navigateTo('profile')">
                 <span class="icon">👤</span>
                 <span class="label">My Profile</span>
             </a>
             <a class="menu-item" onclick="navigateTo('alerts')">
-                <span class="icon">🚨</span>
-                <span class="label">Alert History</span>
-                <span class="badge" id="alertBadge" style="display: none;">0</span>
+                <span class="icon">📋</span>
+                <span class="label">History</span>
             </a>
             <a class="menu-item" onclick="navigateTo('nearby')">
                 <span class="icon">👥</span>
-                <span class="label">Nearby Helpers</span>
+                <span class="label">Nearby</span>
             </a>
             <a class="menu-item" onclick="navigateTo('settings')">
                 <span class="icon">⚙️</span>
@@ -801,6 +810,59 @@
         <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
     </div>
 
+    <!-- SCREEN 6: Live Alerts (Active alerts from past 1 hour) -->
+    <div class="screen" id="screen-live-alerts">
+        <div class="header">
+            <h1>🚨 Live Alerts</h1>
+            <p class="tagline">Active emergencies nearby (last 1 hour)</p>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 20px;">
+            <div class="stat-card">
+                <div class="stat-value" id="liveActiveCount" style="color: #ff4444;">0</div>
+                <div class="stat-label">Active Now</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="liveTotalCount">0</div>
+                <div class="stat-label">Last Hour</div>
+            </div>
+        </div>
+
+        <div id="liveAlertsList">
+            <div class="stat-card" style="text-align: center; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                <p style="color: #888;">No active alerts nearby</p>
+                <p style="color: #666; font-size: 12px; margin-top: 10px;">You're all clear!</p>
+            </div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 20px;">Back</button>
+    </div>
+
+    <!-- SCREEN 7: Notification Center -->
+    <div class="screen" id="screen-notifications">
+        <div class="header">
+            <h1>🔔 Notifications</h1>
+            <p class="tagline">Your alerts and updates</p>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px;" onclick="filterNotifications('all')">All</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px;" onclick="filterNotifications('alert')">Alerts</button>
+            <button class="btn btn-secondary" style="flex: 1; font-size: 14px;" onclick="filterNotifications('response')">Responses</button>
+        </div>
+
+        <div id="notificationsList">
+            <div class="stat-card" style="text-align: center; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 10px;">🔔</div>
+                <p style="color: #888;">No notifications</p>
+            </div>
+        </div>
+
+        <button class="btn btn-secondary" onclick="clearAllNotifications()" style="margin-top: 10px; background: #ff444422; color: #ff4444;">Clear All</button>
+        <button class="btn btn-secondary" onclick="navigateTo('dashboard')" style="margin-top: 10px;">Back</button>
+    </div>
+
     <!-- SCREEN 6: Nearby Helpers -->
     <div class="screen" id="screen-nearby">
         <div class="header">
@@ -955,6 +1017,8 @@
         let selectedAlertType = null;
         let currentAlertId = null;
         let incomingAlertData = null;
+        let notifications = []; // Store notifications
+        let activeLiveAlerts = []; // Store live alerts
 
         const API_URL = window.location.origin;
 
@@ -1055,12 +1119,34 @@
             socket.on('incoming-alert', (data) => {
                 incomingAlertData = data;
                 showIncomingAlert(data);
+                
+                // Add to notifications
+                addNotification({
+                    type: 'alert',
+                    title: '🆘 SOS Alert!',
+                    message: `${data.senderName} needs help with ${data.emergencyType}`,
+                    data: data,
+                    timestamp: new Date()
+                });
+                
+                // Update badge
+                updateBadge('liveAlertBadge');
+                updateBadge('notificationBadge');
             });
 
             // Help is coming
             socket.on('help-coming', (data) => {
                 showToast(`${data.responderName} is coming! ETA: ${data.eta}`, 'success');
                 addResponderToList(data);
+                
+                addNotification({
+                    type: 'response',
+                    title: '✅ Help Coming',
+                    message: `${data.responderName} is on the way (${data.eta})`,
+                    data: data,
+                    timestamp: new Date()
+                });
+                updateBadge('notificationBadge');
             });
 
             // Navigation data
@@ -1343,6 +1429,16 @@
                 case 'dashboard':
                     showScreen('screen-dashboard');
                     break;
+                case 'live-alerts':
+                    loadLiveAlerts();
+                    showScreen('screen-live-alerts');
+                    clearBadge('liveAlertBadge');
+                    break;
+                case 'notifications':
+                    loadNotifications();
+                    showScreen('screen-notifications');
+                    clearBadge('notificationBadge');
+                    break;
                 case 'profile':
                     loadProfile();
                     showScreen('screen-profile');
@@ -1521,6 +1617,244 @@
                 }
             } catch (error) {
                 showToast('Failed to save settings', 'error');
+            }
+        }
+
+        // Notification System
+        function addNotification(notification) {
+            notification.id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            notification.read = false;
+            notifications.unshift(notification); // Add to beginning
+            
+            // Keep only last 50 notifications
+            if (notifications.length > 50) {
+                notifications = notifications.slice(0, 50);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('rubisos_notifications', JSON.stringify(notifications));
+        }
+
+        function loadNotifications() {
+            // Load from localStorage
+            const saved = localStorage.getItem('rubisos_notifications');
+            if (saved) {
+                notifications = JSON.parse(saved);
+            }
+            
+            renderNotifications('all');
+        }
+
+        function renderNotifications(filter) {
+            const container = document.getElementById('notificationsList');
+            
+            let filtered = notifications;
+            if (filter !== 'all') {
+                filtered = notifications.filter(n => n.type === filter);
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="stat-card" style="text-align: center; padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">🔔</div>
+                        <p style="color: #888;">No notifications</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filtered.map(n => {
+                const timeAgo = getTimeAgo(new Date(n.timestamp));
+                const unreadStyle = !n.read ? 'border-left: 4px solid #ff4444;' : '';
+                const icon = n.type === 'alert' ? '🚨' : '✅';
+                
+                return `
+                    <div class="stat-card" style="margin-bottom: 10px; text-align: left; ${unreadStyle}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600;">${icon} ${n.title}</span>
+                            <span style="color: #888; font-size: 12px;">${timeAgo}</span>
+                        </div>
+                        <p style="color: #ccc; font-size: 14px;">${n.message}</p>
+                        ${n.data && n.data.alertId ? `
+                            <button class="btn btn-primary" style="margin-top: 10px; font-size: 14px; padding: 10px;" 
+                                onclick="viewAlert('${n.data.alertId}')">
+                                View Alert
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            // Mark all as read
+            notifications.forEach(n => n.read = true);
+            localStorage.setItem('rubisos_notifications', JSON.stringify(notifications));
+        }
+
+        function filterNotifications(type) {
+            renderNotifications(type);
+        }
+
+        function clearAllNotifications() {
+            notifications = [];
+            localStorage.removeItem('rubisos_notifications');
+            renderNotifications('all');
+            showToast('All notifications cleared', 'success');
+        }
+
+        function viewAlert(alertId) {
+            // Find alert and show details
+            const notification = notifications.find(n => n.data && n.data.alertId === alertId);
+            if (notification && notification.data) {
+                incomingAlertData = notification.data;
+                showIncomingAlert(notification.data);
+            }
+        }
+
+        function updateBadge(badgeId) {
+            const badge = document.getElementById(badgeId);
+            if (badge) {
+                const current = parseInt(badge.textContent) || 0;
+                badge.textContent = current + 1;
+                badge.style.display = 'inline-block';
+            }
+        }
+
+        function clearBadge(badgeId) {
+            const badge = document.getElementById(badgeId);
+            if (badge) {
+                badge.textContent = '0';
+                badge.style.display = 'none';
+            }
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            if (seconds < 60) return 'just now';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + 'm ago';
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + 'h ago';
+            return Math.floor(hours / 24) + 'd ago';
+        }
+
+        // Live Alerts System
+        async function loadLiveAlerts() {
+            if (!currentLocation) {
+                showToast('Getting location...', 'error');
+                getCurrentLocation();
+                return;
+            }
+            
+            try {
+                // Get alerts from API (past 1 hour)
+                const response = await fetch(`${API_URL}/api/alerts/nearby?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radius=50`);
+                const data = await response.json();
+                
+                const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+                activeLiveAlerts = (data.alerts || []).filter(a => new Date(a.createdAt) > oneHourAgo);
+                
+                document.getElementById('liveActiveCount').textContent = activeLiveAlerts.filter(a => a.status === 'active').length;
+                document.getElementById('liveTotalCount').textContent = activeLiveAlerts.length;
+                
+                renderLiveAlerts();
+            } catch (error) {
+                console.error('Failed to load live alerts:', error);
+                document.getElementById('liveAlertsList').innerHTML = `
+                    <div class="stat-card" style="text-align: center; padding: 40px;">
+                        <p style="color: #ff4444;">Failed to load alerts</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderLiveAlerts() {
+            const container = document.getElementById('liveAlertsList');
+            
+            if (activeLiveAlerts.length === 0) {
+                container.innerHTML = `
+                    <div class="stat-card" style="text-align: center; padding: 40px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                        <p style="color: #888;">No active alerts nearby</p>
+                        <p style="color: #666; font-size: 12px; margin-top: 10px;">You're all clear!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = activeLiveAlerts.map(alert => {
+                const timeAgo = getTimeAgo(new Date(alert.createdAt));
+                const isActive = alert.status === 'active';
+                const statusColor = isActive ? '#ff4444' : '#44ff44';
+                const typeIcon = {
+                    medical: '🏥',
+                    fire: '🔥',
+                    security: '🛡️',
+                    accident: '🚗',
+                    other: '🚨'
+                }[alert.type] || '🚨';
+                
+                return `
+                    <div class="stat-card" style="margin-bottom: 15px; text-align: left; border: 2px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-weight: 600; font-size: 18px;">${typeIcon} ${alert.type.toUpperCase()}</span>
+                            <span style="color: ${statusColor}; font-weight: 600;">${isActive ? '🔴 ACTIVE' : '✅ RESOLVED'}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #888;">From:</span>
+                            <span>${alert.senderName}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #888;">When:</span>
+                            <span>${timeAgo}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #888;">Location:</span>
+                            <span style="text-align: right;">${alert.location?.address || 'Unknown'}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: #888;">Responders:</span>
+                            <span style="color: #44ff44;">${alert.responderCount || 0} coming</span>
+                        </div>
+                        
+                        ${alert.description ? `
+                            <p style="color: #ccc; font-size: 14px; margin: 10px 0; padding: 10px; background: #1a1a2e; border-radius: 8px;">
+                                "${alert.description}"
+                            </p>
+                        ` : ''}
+                        
+                        ${isActive ? `
+                            <button class="btn btn-success" style="margin-top: 10px;" 
+                                onclick="respondToLiveAlert('${alert.alertId}')">
+                                ✅ I'm Coming!
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function respondToLiveAlert(alertId) {
+            // Set the incoming alert data and respond
+            const alert = activeLiveAlerts.find(a => a.alertId === alertId);
+            if (alert) {
+                incomingAlertData = {
+                    alertId: alert.alertId,
+                    senderName: alert.senderName,
+                    senderPhone: alert.senderPhone,
+                    location: alert.location,
+                    address: alert.location?.address,
+                    emergencyType: alert.type,
+                    distance: '0.5', // Would calculate from actual location
+                    eta: '5 min'
+                };
+                
+                // Show the accept dialog
+                socket.emit('respond-to-alert', { alertId });
+                showToast('You are responding to the alert!', 'success');
             }
         }
 

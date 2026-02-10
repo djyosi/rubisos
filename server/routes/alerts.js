@@ -328,4 +328,57 @@ router.post('/resolve', async (req, res) => {
     }
 });
 
+// Get nearby active alerts (for Live Alerts screen)
+router.get('/nearby', async (req, res) => {
+    try {
+        const { lat, lng, radius = 50 } = req.query;
+
+        if (!lat || !lng) {
+            return res.status(400).json({ success: false, error: 'lat and lng required' });
+        }
+
+        // Get alerts from last 1 hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+        // Find alerts near location
+        const query = {
+            createdAt: { $gte: oneHourAgo },
+            status: { $in: ['active', 'resolved'] },
+            location: {
+                $near: {
+                    $geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(lng), parseFloat(lat)]
+                    },
+                    $maxDistance: parseFloat(radius) * 1000 // Convert to meters
+                }
+            }
+        };
+
+        const alerts = await Alert.find(query)
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .select('alertId type status senderName senderPhone location description createdAt responders');
+
+        res.json({
+            success: true,
+            count: alerts.length,
+            alerts: alerts.map(a => ({
+                alertId: a.alertId,
+                type: a.type,
+                status: a.status,
+                senderName: a.senderName,
+                senderPhone: a.senderPhone,
+                location: a.location,
+                description: a.description,
+                createdAt: a.createdAt,
+                responderCount: a.responders ? a.responders.filter(r => r.status === 'coming' || r.status === 'arrived').length : 0
+            }))
+        });
+    } catch (error) {
+        console.error('Get nearby alerts error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;
