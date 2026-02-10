@@ -31,14 +31,142 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../client')));
 
+// In-memory storage (for when MongoDB is not available)
+const inMemoryUsers = new Map();
+const inMemoryAlerts = new Map();
+
+// Check if MongoDB is connected
+let mongoConnected = false;
+
 // Connect to database
-connectDB();
+connectDB().then(() => {
+    mongoConnected = true;
+    console.log('✅ Using MongoDB for data storage');
+}).catch(() => {
+    mongoConnected = false;
+    console.log('⚠️ Using in-memory storage (no MongoDB)');
+});
+
+// Helper to get User model (MongoDB or in-memory)
+async function findUserByPhone(phone) {
+    if (mongoConnected) {
+        return await User.findOne({ phone });
+    }
+    return inMemoryUsers.get(phone);
+}
+
+async function createUser(userData) {
+    if (mongoConnected) {
+        const user = new User(userData);
+        await user.save();
+        return user;
+    }
+    const user = { ...userData, _id: 'user_' + Date.now(), createdAt: new Date() };
+    inMemoryUsers.set(userData.phone, user);
+    return user;
+}
+
+async function updateUser(phone, updates) {
+    if (mongoConnected) {
+        return await User.findOneAndUpdate({ phone }, updates, { new: true });
+    }
+    const user = inMemoryUsers.get(phone);
+    if (user) {
+        Object.assign(user, updates);
+        inMemoryUsers.set(phone, user);
+    }
+    return user;
+}
 
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/alerts', alertRoutes);
 
-// In-memory storage for active socket connections (fallback if DB is down)
+// Fallback login endpoint (in-memory mode)
+app.post('/api/users/login', async (req, res) => {
+    try {
+        const { phone } = req.body;
+        console.log('Login attempt:', phone);
+        
+        const user = await findUserByPhone(phone);
+        
+        if (!user) {
+            console.log('User not found:', phone);
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        console.log('User found:', user.name);
+        res.json({
+            success: true,
+            user: {
+                id: user._id || user.id,
+                phone: user.phone,
+                name: user.name,
+                dateOfBirth: user.dateOfBirth,
+                homeAddress: user.homeAddress,
+                bloodType: user.bloodType,
+                age: user.dateOfBirth ? Math.floor((new Date() - new Date(user.dateOfBirth)) / 31536000000) : null
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Fallback register endpoint (in-memory mode)
+app.post('/api/users/register', async (req, res) => {
+    try {
+        const { phone, name, dateOfBirth, homeAddress, bloodType } = req.body;
+        console.log('Register attempt:', phone, name);
+        
+        // Check if user exists
+        const existingUser = await findUserByPhone(phone);
+        if (existingUser) {
+            console.log('User already exists:', phone);
+            return res.json({
+                success: true,
+                message: 'User already exists',
+                user: {
+                    id: existingUser._id || existingUser.id,
+                    phone: existingUser.phone,
+                    name: existingUser.name
+                }
+            });
+        }
+
+        // Create new user
+        const user = await createUser({
+            phone,
+            name,
+            dateOfBirth: new Date(dateOfBirth),
+            homeAddress,
+            bloodType,
+            isOnline: false,
+            canReceiveAlerts: true,
+            alertRadius: 10
+        });
+
+        const age = Math.floor((new Date() - new Date(dateOfBirth)) / 31536000000);
+        console.log('User created:', name, age);
+
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully',
+            user: {
+                id: user._id || user.id,
+                phone: user.phone,
+                name: user.name,
+                age
+            }
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// In-memory storage for active socket connections
 const activeSockets = new Map();
 
 // Socket.io connection handling
