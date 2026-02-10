@@ -569,32 +569,64 @@
         <span id="connectionText">Connecting...</span>
     </div>
 
-    <!-- SCREEN 1: Registration -->
-    <div class="screen" id="screen-register">
+    <!-- SCREEN 1: Login -->
+    <div class="screen active" id="screen-login">
         <div class="header">
             <div class="logo">🆘</div>
             <h1 class="app-title">rubiSOS</h1>
             <p class="tagline">Emergency response network</p>
         </div>
 
-        <form id="registerForm">
+        <form id="loginForm">
             <div class="form-group">
                 <label>Phone Number</label>
+                <input type="tel" id="loginPhone" placeholder="+972501234567" required>
+                <small style="color: #888; display: block; margin-top: 5px;">Format: +972XXXXXXXXX</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">🔐 Login</button>
+            
+            <div style="text-align: center; margin: 20px 0; color: #888;">
+                ─── or ───
+            </div>
+            
+            <button type="button" class="btn btn-secondary" onclick="showScreen('screen-register')">
+                📝 Create New Account
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 30px; padding: 20px; background: #222; border-radius: 12px;">
+            <p style="color: #888; font-size: 14px;">🔒 Secure emergency response network</p>
+            <p style="color: #666; font-size: 12px; margin-top: 10px;">Your data is encrypted and protected</p>
+        </div>
+    </div>
+
+    <!-- SCREEN 1b: Registration -->
+    <div class="screen" id="screen-register">
+        <div class="header">
+            <div class="logo">📝</div>
+            <h1 class="app-title">Create Account</h1>
+            <p class="tagline">Join the emergency network</p>
+        </div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label>Phone Number *</label>
                 <input type="tel" id="regPhone" placeholder="+972501234567" required>
             </div>
 
             <div class="form-group">
-                <label>Full Name</label>
+                <label>Full Name *</label>
                 <input type="text" id="regName" placeholder="Your full name" required>
             </div>
 
             <div class="form-group">
-                <label>Date of Birth</label>
+                <label>Date of Birth *</label>
                 <input type="date" id="regDOB" required>
             </div>
 
             <div class="form-group">
-                <label>Home Address</label>
+                <label>Home Address *</label>
                 <input type="text" id="regStreet" placeholder="Street address" required>
                 <input type="text" id="regCity" placeholder="City" required style="margin-top: 10px;">
             </div>
@@ -614,7 +646,10 @@
                 </select>
             </div>
 
-            <button type="submit" class="btn btn-primary">Register</button>
+            <button type="submit" class="btn btn-primary">✅ Register</button>
+            <button type="button" class="btn btn-secondary" onclick="showScreen('screen-login')">
+                ← Back to Login
+            </button>
         </form>
     </div>
 
@@ -929,15 +964,20 @@
         });
 
         function initApp() {
-            // Check if user is already registered
+            // Check if user is already logged in
             const savedUser = localStorage.getItem('rubisos_user');
-            if (savedUser) {
+            const authToken = localStorage.getItem('rubisos_token');
+            
+            if (savedUser && authToken) {
                 currentUser = JSON.parse(savedUser);
                 connectSocket();
                 showScreen('screen-dashboard');
                 updateUserDisplay();
             } else {
-                showScreen('screen-register');
+                // Clear any stale data
+                localStorage.removeItem('rubisos_user');
+                localStorage.removeItem('rubisos_token');
+                showScreen('screen-login');
             }
 
             setupEventListeners();
@@ -945,6 +985,9 @@
         }
 
         function setupEventListeners() {
+            // Login form
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+
             // Registration form
             document.getElementById('registerForm').addEventListener('submit', handleRegister);
 
@@ -1045,16 +1088,79 @@
             }, 30000); // Every 30 seconds
         }
 
+        // Handle login
+        async function handleLogin(e) {
+            e.preventDefault();
+
+            const phone = document.getElementById('loginPhone').value.trim();
+
+            // Validate phone format
+            const phoneRegex = /^\+972[0-9]{9}$/;
+            if (!phoneRegex.test(phone)) {
+                showToast('Invalid phone format. Use +972XXXXXXXXX', 'error');
+                return;
+            }
+
+            showToast('Logging in...', '');
+
+            try {
+                const response = await fetch(`${API_URL}/api/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store user data and token
+                    currentUser = data.user;
+                    localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
+                    
+                    // Generate a simple client token (in production, this comes from server)
+                    const token = 'token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('rubisos_token', token);
+
+                    showToast('Login successful!', 'success');
+                    connectSocket();
+                    showScreen('screen-dashboard');
+                    updateUserDisplay();
+                } else {
+                    if (data.error === 'User not found') {
+                        showToast('Account not found. Please register.', 'error');
+                        setTimeout(() => {
+                            document.getElementById('regPhone').value = phone;
+                            showScreen('screen-register');
+                        }, 1500);
+                    } else {
+                        showToast(data.error || 'Login failed', 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('Network error. Please try again.', 'error');
+            }
+        }
+
         // Handle registration
         async function handleRegister(e) {
             e.preventDefault();
 
-            const phone = document.getElementById('regPhone').value;
-            const name = document.getElementById('regName').value;
+            const phone = document.getElementById('regPhone').value.trim();
+            const name = document.getElementById('regName').value.trim();
             const dateOfBirth = document.getElementById('regDOB').value;
-            const street = document.getElementById('regStreet').value;
-            const city = document.getElementById('regCity').value;
+            const street = document.getElementById('regStreet').value.trim();
+            const city = document.getElementById('regCity').value.trim();
             const bloodType = document.getElementById('regBloodType').value;
+
+            // Validate phone format
+            const phoneRegex = /^\+972[0-9]{9}$/;
+            if (!phoneRegex.test(phone)) {
+                showToast('Invalid phone format. Use +972XXXXXXXXX', 'error');
+                return;
+            }
+
+            showToast('Creating account...', '');
 
             // Get coordinates for address (simplified - should use geocoding API)
             const coordinates = await getAddressCoordinates(street, city);
@@ -1081,17 +1187,30 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    currentUser = { phone, name, ...data.user };
+                    // Store user data and token
+                    currentUser = { ...userData, id: data.user.id, age: data.user.age };
                     localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
-                    showToast('Registered successfully!', 'success');
+                    
+                    // Generate a simple client token
+                    const token = 'token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('rubisos_token', token);
+
+                    showToast('Account created! Welcome!', 'success');
                     connectSocket();
                     showScreen('screen-dashboard');
                     updateUserDisplay();
                 } else {
-                    showToast(data.error || 'Registration failed', 'error');
+                    if (data.message && data.message.includes('already exists')) {
+                        showToast('Phone number already registered. Please login.', 'error');
+                        document.getElementById('loginPhone').value = phone;
+                        setTimeout(() => showScreen('screen-login'), 1500);
+                    } else {
+                        showToast(data.error || 'Registration failed', 'error');
+                    }
                 }
             } catch (error) {
-                showToast('Network error', 'error');
+                console.error('Registration error:', error);
+                showToast('Network error. Please try again.', 'error');
             }
         }
 
@@ -1245,11 +1364,15 @@
 
         function logout() {
             localStorage.removeItem('rubisos_user');
+            localStorage.removeItem('rubisos_token');
             currentUser = null;
             if (socket) socket.disconnect();
-            showScreen('screen-register');
+            showScreen('screen-login');
             showToast('Logged out successfully', 'success');
             closeMenu();
+            
+            // Clear form fields
+            document.getElementById('loginPhone').value = '';
         }
 
         // Load profile data
