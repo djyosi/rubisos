@@ -593,7 +593,7 @@
                 <small style="color: #888; display: block; margin-top: 5px;">Format: +972XXXXXXXXX</small>
             </div>
 
-            <button type="submit" class="btn btn-primary">🔐 Login</button>
+            <button type="submit" class="btn btn-primary" onclick="handleLogin(event)">🔐 Login</button>
             
             <div style="text-align: center; margin: 20px 0; color: #888;">
                 ─── or ───
@@ -1074,8 +1074,16 @@
         }
 
         function setupEventListeners() {
+            console.log('Setting up event listeners...');
+            
             // Login form
-            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) {
+                loginForm.addEventListener('submit', handleLogin);
+                console.log('Login form listener attached');
+            } else {
+                console.error('Login form not found');
+            }
 
             // Registration form
             document.getElementById('registerForm').addEventListener('submit', handleRegister);
@@ -1201,9 +1209,26 @@
 
         // Handle login
         async function handleLogin(e) {
-            e.preventDefault();
+            console.log('Login clicked');
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
 
-            const phone = document.getElementById('loginPhone').value.trim();
+            const phoneInput = document.getElementById('loginPhone');
+            if (!phoneInput) {
+                console.error('Phone input not found');
+                showToast('Error: Phone field not found', 'error');
+                return;
+            }
+
+            const phone = phoneInput.value.trim();
+            console.log('Phone entered:', phone);
+
+            if (!phone) {
+                showToast('Please enter your phone number', 'error');
+                return;
+            }
 
             // Validate phone format
             const phoneRegex = /^\+972[0-9]{9}$/;
@@ -1215,28 +1240,37 @@
             showToast('Logging in...', '');
 
             try {
+                console.log('Fetching login...');
                 const response = await fetch(`${API_URL}/api/users/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone })
                 });
 
+                console.log('Response received:', response.status);
                 const data = await response.json();
+                console.log('Data:', data);
 
                 if (data.success) {
+                    console.log('Login success, storing user...');
                     // Store user data and token
                     currentUser = data.user;
                     localStorage.setItem('rubisos_user', JSON.stringify(currentUser));
                     
-                    // Generate a simple client token (in production, this comes from server)
+                    // Generate a simple client token
                     const token = 'token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                     localStorage.setItem('rubisos_token', token);
 
                     showToast('Login successful!', 'success');
+                    console.log('Connecting socket...');
                     connectSocket();
+                    console.log('Going to home screen...');
                     showScreen('screen-home');
+                    console.log('Updating display...');
                     updateUserDisplay();
+                    console.log('Login complete!');
                 } else {
+                    console.log('Login failed:', data.error);
                     if (data.error === 'User not found') {
                         showToast('Account not found. Please register.', 'error');
                         setTimeout(() => {
