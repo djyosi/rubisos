@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🆘 rubiSOS - Emergency Safety App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Splash Screen */
+        .splash {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+        .splash.hidden { opacity: 0; pointer-events: none; }
+        .splash-icon { font-size: 80px; margin-bottom: 20px; }
+        .splash h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .splash p { opacity: 0.9; }
+        
+        /* Header */
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo { font-size: 1.5rem; font-weight: 700; }
+        .status { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+        .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        /* Main Content */
+        .container { flex: 1; padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; }
+        
+        /* Screen Management */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* SOS Button Screen */
+        .sos-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+        }
+        .sos-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(220, 38, 38, 0.5);
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .sos-button:active { transform: scale(0.95); }
+        .sos-button.counting { animation: countdown 3s linear; }
+        @keyframes countdown {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            100% { box-shadow: 0 0 0 50px rgba(220, 38, 38, 0); }
+        }
+        .sos-label { font-size: 0.9rem; opacity: 0.9; }
+        .sos-instruction {
+            margin-top: 30px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        /* Emergency Type Selection */
+        .emergency-types {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .emergency-type {
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .emergency-type:hover { background: rgba(255,255,255,0.1); }
+        .emergency-type.selected {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.2);
+        }
+        .emergency-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .emergency-label { font-size: 0.8rem; }
+        
+        /* Active Emergency Screen */
+        .emergency-active {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .emergency-pulse {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: #dc2626;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            animation: emergency-pulse 1s infinite;
+        }
+        @keyframes emergency-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .broadcast-status {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .broadcast-status h3 { color: #22c55e; margin-bottom: 5px; }
+        .helper-count { font-size: 2rem; font-weight: 700; color: #22c55e; }
+        
+        /* Helper Map */
+        .map-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            height: 300px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .map-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #64748b;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .map-dot {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            animation: float 3s ease-in-out infinite;
+        }
+        .map-dot.you { background: #dc2626; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .map-dot.helper { background: #22c55e; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* Profile Screen */
+        .profile-form { margin-top: 20px; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; color: #94a3b8; font-size: 0.9rem; }
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+        }
+        .form-input:focus { outline: none; border-color: #3b82f6; }
+        
+        /* Photo Upload */
+        .photo-upload {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            border: 2px dashed rgba(255,255,255,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            cursor: pointer;
+            font-size: 2rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+        
+        /* Navigation */
+        .nav-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .nav-item.active { color: #3b82f6; }
+        .nav-icon { font-size: 1.5rem; }
+        
+        /* Helpers List */
+        .helpers-list { margin-top: 20px; }
+        .helper-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .helper-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .helper-info { flex: 1; }
+        .helper-name { font-weight: 600; }
+        .helper-distance { font-size: 0.8rem; color: #94a3b8; }
+        .helper-eta { color: #22c55e; font-size: 0.9rem; }
+        
+        /* Cancel Button */
+        .cancel-btn {
+            margin-top: 30px;
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        h2 { margin-bottom: 10px; }
+        .subtitle { color: #94a3b8; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div class="splash" id="splash">
+        <div class="splash-icon">🆘</div>
+        <h1>rubiSOS</h1>
+        <p>One-tap emergency help</p>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">🆘 rubiSOS</div>
+        <div class="status">
+            <div class="status-dot"></div>
+            <span>Ready</span>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        
+        <!-- HOME SCREEN - SOS BUTTON -->
+        <div class="screen active" id="screen-home">
+            <div class="sos-container">
+                <button class="sos-button" id="sosBtn" onclick="startSOS()">
+                    <span>SOS</span>
+                    <span class="sos-label">HOLD 3 SEC</span>
+                </button>
+                <p class="sos-instruction">
+                    Hold button for 3 seconds to activate<br>
+                    Your location will be shared with nearby helpers
+                </p>
+                
+                <div class="emergency-types">
+                    <div class="emergency-type selected" onclick="selectType(this, 'medical')">
+                        <div class="emergency-icon">🚑</div>
+                        <div class="emergency-label">Medical</div>
+                    </div>
+                    <div class="emergency-type" onclick="selectType(this, 'crime')">
+                        <div class="emergency-icon">🦹</div>
+                        <div class="emergency-label">Crime</div>
+                    </div>
+                    <div class="emergency-type" onclick="selectType(this, 'fire')">
+                        <div class="emergency-icon">🔥</div>
+                        <div class="emergency-label">Fire</div>
+                    </div>
+                    <div class="emergency-type" onclick="selectType(this, 'accident')">
+                        <div class="emergency-icon">💥</div>
+                        <div class="emergency-label">Accident</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EMERGENCY ACTIVE SCREEN -->
+        <div class="screen" id="screen-emergency">
+            <div class="emergency-active">
+                <div class="emergency-pulse">🆘</div>
+                <h2>EMERGENCY ACTIVE</h2>
+                <p class="subtitle">Broadcasting your location...</p>
+                
+                <div class="broadcast-status">
+                    <h3>✅ Location Shared</h3>
+                    <p>GPS coordinates sent to nearby helpers</p>
+                </div>
+                
+                <div class="helper-count" id="helperCount">3 HELPERS</div>
+                <p style="color: #94a3b8; margin-top: 5px;">are responding</p>
+                
+                <div class="map-container">
+                    <div class="map-dot you">🆘</div>
+                    <div class="map-dot helper" style="top: 20%; left: 30%;">👤</div>
+                    <div class="map-dot helper" style="top: 70%; left: 60%; animation-delay: 0.5s;">👤</div>
+                    <div class="map-dot helper" style="top: 40%; left: 80%; animation-delay: 1s;">👤</div>
+                </div>
+                
+                <div class="helpers-list">
+                    <div class="helper-card">
+                        <div class="helper-avatar">👨‍⚕️</div>
+                        <div class="helper-info">
+                            <div class="helper-name">David M.</div>
+                            <div class="helper-distance">0.3 miles away</div>
+                        </div>
+                        <div class="helper-eta">2 min</div>
+                    </div>
+                    <div class="helper-card">
+                        <div class="helper-avatar">👮</div>
+                        <div class="helper-info">
+                            <div class="helper-name">Sarah K.</div>
+                            <div class="helper-distance">0.5 miles away</div>
+                        </div>
+                        <div class="helper-eta">4 min</div>
+                    </div>
+                </div>
+                
+                <button class="cancel-btn" onclick="cancelEmergency()">✕ Cancel Emergency</button>
+            </div>
+        </div>
+
+        <!-- PROFILE SCREEN -->
+        <div class="screen" id="screen-profile">
+            <h2>Your Profile</h2>
+            <p class="subtitle">This info helps responders identify you</p>
+            
+            <div class="photo-upload">📷</div>
+            
+            <div class="profile-form">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-input" placeholder="John Smith" value="Yosi">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Emergency Contact</label>
+                    <input type="tel" class="form-input" placeholder="+1 234 567 890">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Blood Type (Optional)</label>
+                    <input type="text" class="form-input" placeholder="O+">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Medical Notes</label>
+                    <input type="text" class="form-input" placeholder="Allergies, conditions...">
+                </div>
+                <button class="btn btn-primary">Save Profile</button>
+            </div>
+        </div>
+
+        <!-- SETTINGS SCREEN -->
+        <div class="screen" id="screen-settings">
+            <h2>Settings</h2>
+            <p class="subtitle">Customize your emergency preferences</p>
+            
+            <div class="form-group">
+                <label class="form-label">Broadcast Radius</label>
+                <select class="form-input">
+                    <option>500 meters</option>
+                    <option selected>1 kilometer</option>
+                    <option>2 kilometers</option>
+                    <option>5 kilometers</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">SOS Button Sensitivity</label>
+                <select class="form-input">
+                    <option>Instant (1 tap)</option>
+                    <option selected>3 second hold</option>
+                    <option>5 second hold</option>
+                </select>
+            </div>
+            
+            <button class="btn btn-secondary">Enable Fake Call Feature</button>
+            <button class="btn btn-secondary">Connect to Emergency Services</button>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <div class="nav-bar">
+        <div class="nav-item active" onclick="showScreen('screen-home')">
+            <span class="nav-icon">🆘</span>
+            <span>SOS</span>
+        </div>
+        <div class="nav-item" onclick="showScreen('screen-profile')">
+            <span class="nav-icon">👤</span>
+            <span>Profile</span>
+        </div>
+        <div class="nav-item" onclick="showScreen('screen-settings')">
+            <span class="nav-icon">⚙️</span>
+            <span>Settings</span>
+        </div>
+    </div>
+
+    <script>
+        // Hide splash screen after 2 seconds
+        setTimeout(() => {
+            document.getElementById('splash').classList.add('hidden');
+        }, 2000);
+
+        // Screen navigation
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            event.target.closest('.nav-item').classList.add('active');
+        }
+
+        // Emergency type selection
+        let selectedType = 'medical';
+        function selectType(el, type) {
+            document.querySelectorAll('.emergency-type').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedType = type;
+        }
+
+        // SOS Button Logic
+        let sosTimer = null;
+        const sosBtn = document.getElementById('sosBtn');
+        
+        sosBtn.addEventListener('mousedown', startHold);
+        sosBtn.addEventListener('touchstart', startHold);
+        sosBtn.addEventListener('mouseup', endHold);
+        sosBtn.addEventListener('touchend', endHold);
+        sosBtn.addEventListener('mouseleave', endHold);
+
+        function startHold(e) {
+            e.preventDefault();
+            sosBtn.classList.add('counting');
+            sosBtn.innerHTML = '<span>3</span><span class="sos-label">HOLD...</span>';
+            
+            let count = 3;
+            sosTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    sosBtn.innerHTML = `<span>${count}</span><span class="sos-label">HOLD...</span>`;
+                } else {
+                    clearInterval(sosTimer);
+                    activateSOS();
+                }
+            }, 1000);
+        }
+
+        function endHold() {
+            clearInterval(sosTimer);
+            sosBtn.classList.remove('counting');
+            sosBtn.innerHTML = '<span>SOS</span><span class="sos-label">HOLD 3 SEC</span>';
+        }
+
+        function activateSOS() {
+            // Vibrate if supported
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 1000]);
+            }
+            
+            // Switch to emergency screen
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-emergency').classList.add('active');
+            
+            // Simulate helpers arriving
+            simulateHelpers();
+        }
+
+        function simulateHelpers() {
+            let count = 3;
+            setInterval(() => {
+                count++;
+                document.getElementById('helperCount').textContent = count + ' HELPERS';
+            }, 5000);
+        }
+
+        function cancelEmergency() {
+            if (confirm('Are you sure you want to cancel the emergency?')) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById('screen-home').classList.add('active');
+                
+                // Reset nav
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                document.querySelectorAll('.nav-item')[0].classList.add('active');
+            }
+        }
+
+        // Get location on load
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => console.log('Location:', pos.coords.latitude, pos.coords.longitude),
+                (err) => console.log('Location error:', err)
+            );
+        }
+    </script>
+</body>
+</html>

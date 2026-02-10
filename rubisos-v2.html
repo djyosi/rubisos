@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>rubiSOS - Emergency Alert</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* SCREENS */
+        .screen { display: none; min-height: 100vh; }
+        .screen.active { display: flex; flex-direction: column; }
+        
+        /* USER SELECTION */
+        .select-screen {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+            padding: 40px 20px;
+            justify-content: center;
+        }
+        
+        .select-title {
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .select-subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 40px;
+        }
+        
+        .user-option {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .user-option:hover, .user-option:active {
+            border-color: #3b82f6;
+            background: rgba(59,130,246,0.1);
+        }
+        
+        .user-option.tami:hover, .user-option.tami:active {
+            border-color: #ec4899;
+            background: rgba(236,72,153,0.1);
+        }
+        
+        .user-name-big {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .user-location {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        /* SENDER SCREEN (Yosi) */
+        .sender-screen {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+            padding: 20px;
+        }
+        
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .profile-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 50px;
+        }
+        
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .switch-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .emergency-types {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        
+        .type-btn {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .type-btn.selected {
+            border-color: #dc2626;
+            background: rgba(220,38,38,0.2);
+        }
+        
+        .type-icon { font-size: 28px; margin-bottom: 6px; }
+        .type-label { font-size: 14px; }
+        
+        .sos-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border: none;
+            color: white;
+            font-size: 48px;
+            font-weight: 800;
+            cursor: pointer;
+            margin: 0 auto;
+            box-shadow: 0 0 60px rgba(220,38,38,0.5);
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sos-button:active {
+            transform: scale(0.95);
+        }
+        
+        .sos-button.counting {
+            animation: pulse-red 1s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
+            50% { box-shadow: 0 0 0 40px rgba(220,38,38,0); }
+        }
+        
+        .sos-subtext {
+            font-size: 12px;
+            font-weight: 400;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+        
+        .hint-text {
+            text-align: center;
+            color: #666;
+            margin-top: 30px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        /* WAITING SCREEN */
+        .waiting-screen {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+            padding: 40px 20px;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .spinner {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #22c55e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 30px;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .waiting-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .waiting-text {
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        /* RESPONSE RECEIVED */
+        .response-received {
+            background: rgba(34,197,94,0.1);
+            border: 2px solid #22c55e;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+        
+        .responder-name {
+            color: #22c55e;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .eta-big {
+            font-size: 48px;
+            font-weight: 700;
+            color: #22c55e;
+            margin: 10px 0;
+        }
+        
+        /* FULL SCREEN ALERT (RECEIVER) */
+        .alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            padding: 15px 20px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            animation: slide-up 0.4s ease;
+        }
+        
+        .alert-overlay.active {
+            display: flex;
+        }
+        
+        @keyframes slide-up {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        .alert-header {
+            text-align: center;
+            padding-top: 5px;
+            flex-shrink: 0;
+        }
+        
+        .alert-icon {
+            font-size: 40px;
+            margin-bottom: 2px;
+            animation: shake 0.5s infinite;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        .alert-title {
+            font-size: 24px;
+            font-weight: 800;
+        }
+        
+        .alert-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+        
+        .emergency-badge {
+            background: rgba(0,0,0,0.3);
+            padding: 8px 16px;
+            border-radius: 50px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 10px auto;
+            display: inline-block;
+        }
+        
+        /* INFO CARD */
+        .info-card {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+        
+        .sender-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sender-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        
+        .sender-info {
+            flex: 1;
+        }
+        
+        .sender-name {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .call-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #22c55e;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: rgba(255,255,255,0.6);
+            font-size: 13px;
+        }
+        
+        .info-value {
+            font-weight: 600;
+            font-size: 14px;
+            text-align: right;
+        }
+        
+        .info-value.distance {
+            color: #fbbf24;
+            font-size: 16px;
+        }
+        
+        /* RESPONSE BUTTONS */
+        .response-buttons {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-bottom: 20px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+        }
+        
+        .response-btn {
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .response-btn.coming {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .response-btn.reject {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .response-btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* RECEIVER WAITING SCREEN */
+        .receiver-screen {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+            padding: 20px;
+        }
+        
+        .receiver-waiting {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .radar {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 3px solid rgba(34,197,94,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        .radar::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid rgba(34,197,94,0.2);
+            animation: radar 2s infinite;
+        }
+        
+        @keyframes radar {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        .radar-icon {
+            font-size: 50px;
+        }
+        
+        .status-text {
+            color: #22c55e;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .status-sub {
+            color: #888;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        /* TEST BUTTONS */
+        .test-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.9);
+            border-radius: 16px;
+            padding: 16px;
+            z-index: 100;
+        }
+        
+        .test-title {
+            color: #fbbf24;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .test-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .cancel-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- USER SELECTION -->
+    <div class="screen select-screen active" id="screen-select">
+        <h1 class="select-title">Who are you?</h1>
+        <p class="select-subtitle">Select your profile</p>
+        
+        <div class="user-option tami" onclick="selectUser('tami')">
+            <div class="user-name-big">👩 Tami</div>
+            <div class="user-location">📍 NW11 7NA, London</div>
+        </div>
+        
+        <div class="user-option" onclick="selectUser('yosi')">
+            <div class="user-name-big">👨 Yosi</div>
+            <div class="user-location">📍 N3 3DP, London</div>
+        </div>
+    </div>
+    
+    <!-- SENDER SCREEN (Yosi) -->
+    <div class="screen sender-screen" id="screen-yosi">
+        <div class="header-bar">
+            <div class="profile-pill">
+                <div class="avatar">👨</div>
+                <span>Yosi</span>
+            </div>
+            <button class="switch-btn" onclick="switchUser()">Switch</button>
+        </div>
+        
+        <div class="emergency-types">
+            <div class="type-btn selected" onclick="selectType(this, 'medical')">
+                <div class="type-icon">🚑</div>
+                <div class="type-label">Medical</div>
+            </div>
+            <div class="type-btn" onclick="selectType(this, 'crime')">
+                <div class="type-icon">🦹</div>
+                <div class="type-label">Crime</div>
+            </div>
+            <div class="type-btn" onclick="selectType(this, 'fire')">
+                <div class="type-icon">🔥</div>
+                <div class="type-label">Fire</div>
+            </div>
+            <div class="type-btn" onclick="selectType(this, 'other')">
+                <div class="type-icon">⚠️</div>
+                <div class="type-label">Other</div>
+            </div>
+        </div>
+        
+        <button class="sos-button" id="sosBtn">
+            <span>SOS</span>
+            <span class="sos-subtext">HOLD 3 SEC</span>
+        </button>
+        
+        <p class="hint-text">
+            Press and hold to send emergency alert<br>
+            to nearby helpers
+        </p>
+        
+        <!-- Test Controls -->
+        <div class="test-panel">
+            <div class="test-title">🧪 Test Controls</div>
+            <button class="test-btn" onclick="simulateReceiveOnTami()">Simulate Tami Receives</button>
+            <button class="test-btn" onclick="simulateTamiResponse()">Simulate Tami Responds</button>
+            <p style="color: #666; font-size: 12px; margin-top: 8px;">
+                For 2-device test: Open this on another device, select Tami, then tap "Simulate Receive"
+            </p>
+        </div>
+    </div>
+    
+    <!-- WAITING SCREEN (Yosi) -->
+    <div class="screen waiting-screen" id="screen-waiting">
+        <div class="spinner"></div>
+        <h2 class="waiting-title">Alert Sent!</h2>
+        <p class="waiting-text">Broadcasting to nearby helpers...</p>
+        
+        <div id="noResponse" style="width: 100%;">
+            <p style="color: #666; margin-bottom: 30px;">⏳ Waiting for response...</p>
+            <button class="cancel-btn" onclick="cancelSOS()">Cancel Emergency</button>
+        </div>
+        
+        <div id="hasResponse" style="display: none; width: 100%;">
+            <div class="response-received">
+                <div class="responder-name">✅ Tami is coming!</div>
+                <div class="eta-big" id="etaDisplay">8 min</div>
+                <p style="color: #888; font-size: 14px;">She can see your exact location</p>
+            </div>
+            <button class="cancel-btn" onclick="cancelSOS()">Cancel Emergency</button>
+        </div>
+    </div>
+    
+    <!-- RECEIVER SCREEN (Tami) -->
+    <div class="screen receiver-screen" id="screen-tami">
+        <div class="header-bar">
+            <div class="profile-pill">
+                <div class="avatar" style="background: linear-gradient(135deg, #ec4899, #f472b6);">👩</div>
+                <span>Tami</span>
+            </div>
+            <button class="switch-btn" onclick="switchUser()">Switch</button>
+        </div>
+        
+        <div class="receiver-waiting" id="tamiWaiting">
+            <div class="radar">
+                <div class="radar-icon">📡</div>
+            </div>
+            <div class="status-text">Monitoring for alerts</div>
+            <div class="status-sub">
+                You'll be notified immediately<br>
+                if someone nearby needs help
+            </div>
+            
+            <button class="test-btn" onclick="showIncomingAlert()" style="margin-top: 40px;">
+                🧪 Simulate Incoming Alert
+            </button>
+        </div>
+    </div>
+    
+    <!-- FULL SCREEN ALERT (Receiver sees this) -->
+    <div class="alert-overlay" id="alertOverlay">
+        <div class="alert-header">
+            <div class="alert-icon">🆘</div>
+            <div class="alert-title">EMERGENCY!</div>
+        </div>
+        
+        <div class="emergency-badge" id="alertType">🚑 MEDICAL</div>
+        
+        <div class="info-card">
+            <div class="sender-header">
+                <div class="sender-avatar">👨</div>
+                <div class="sender-info">
+                    <div class="sender-name">Yosi</div>
+                </div>
+                <button class="call-btn" onclick="callSender()">📞</button>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">📍 Address</span>
+                <span class="info-value">N3 3DP, London</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">📏 Distance</span>
+                <span class="info-value distance">2.1 km • 8 min</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">📱 Phone</span>
+                <span class="info-value">+44 7700 900003</span>
+            </div>
+        </div>
+        
+        <div class="response-buttons">
+            <button class="response-btn coming" onclick="respond('coming')">
+                ✅ I'M COMING
+            </button>
+            <button class="response-btn reject" onclick="respond('reject')">
+                ❌ CAN'T HELP
+            </button>
+        </div>
+    </div>
+    
+    <!-- RESPONSE CONFIRMATION -->
+    <div class="screen" id="screen-confirmation" style="background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%); padding: 40px 20px; text-align: center; justify-content: center;">
+        <div style="font-size: 80px; margin-bottom: 20px;">✅</div>
+        <h2 style="font-size: 28px; margin-bottom: 10px;">You're on the way!</h2>
+        <p style="color: #888; margin-bottom: 30px;">Yosi has been notified</p>
+        
+        <div style="background: rgba(34,197,94,0.1); border: 2px solid #22c55e; border-radius: 16px; padding: 24px; margin-bottom: 30px;">
+            <div style="color: #22c55e; font-size: 14px; font-weight: 600; margin-bottom: 10px;">NAVIGATE TO</div>
+            <div style="font-size: 20px; font-weight: 600; margin-bottom: 5px;">N3 3DP, London</div>
+            <div style="color: #888; font-size: 14px;">~8 minutes away</div>
+        </div>
+        
+        <button class="response-btn coming" onclick="openNavigation()" style="width: 100%; margin-bottom: 12px;">
+            🗺️ OPEN NAVIGATION
+        </button>
+        <button class="cancel-btn" onclick="backToWaiting()" style="width: 100%; margin: 0;">
+            Back to Monitoring
+        </button>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let currentEmergency = 'medical';
+        let sosTimer = null;
+        let alertData = null;
+        
+        const emergencyLabels = {
+            medical: '🚑 MEDICAL EMERGENCY',
+            crime: '🦹 CRIME IN PROGRESS',
+            fire: '🔥 FIRE EMERGENCY',
+            other: '⚠️ EMERGENCY'
+        };
+        
+        function selectUser(user) {
+            currentUser = user;
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            
+            if (user === 'yosi') {
+                document.getElementById('screen-yosi').classList.add('active');
+            } else {
+                document.getElementById('screen-tami').classList.add('active');
+            }
+        }
+        
+        function switchUser() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('alertOverlay').classList.remove('active');
+            document.getElementById('screen-select').classList.add('active');
+            currentUser = null;
+        }
+        
+        function selectType(el, type) {
+            document.querySelectorAll('.type-btn').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            currentEmergency = type;
+        }
+        
+        // SOS Button Logic
+        const sosBtn = document.getElementById('sosBtn');
+        
+        sosBtn.addEventListener('touchstart', startHold, {passive: false});
+        sosBtn.addEventListener('mousedown', startHold);
+        sosBtn.addEventListener('touchend', endHold);
+        sosBtn.addEventListener('mouseup', endHold);
+        sosBtn.addEventListener('mouseleave', endHold);
+        
+        function startHold(e) {
+            if (e.preventDefault) e.preventDefault();
+            sosBtn.classList.add('counting');
+            
+            let count = 3;
+            sosBtn.innerHTML = `<span>${count}</span><span class="sos-subtext">HOLD...</span>`;
+            
+            sosTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    sosBtn.innerHTML = `<span>${count}</span><span class="sos-subtext">HOLD...</span>`;
+                } else {
+                    clearInterval(sosTimer);
+                    sendSOS();
+                }
+            }, 1000);
+        }
+        
+        function endHold() {
+            clearInterval(sosTimer);
+            sosBtn.classList.remove('counting');
+            sosBtn.innerHTML = '<span>SOS</span><span class="sos-subtext">HOLD 3 SEC</span>';
+        }
+        
+        function sendSOS() {
+            // Vibrate
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+            
+            // Store alert
+            alertData = {
+                from: 'yosi',
+                type: currentEmergency,
+                timestamp: Date.now(),
+                location: 'N3 3DP, London',
+                lat: 51.532,
+                lng: -0.178
+            };
+            localStorage.setItem('rubisos_alert', JSON.stringify(alertData));
+            
+            // Show waiting screen
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-waiting').classList.add('active');
+            
+            // Reset for demo
+            sosBtn.innerHTML = '<span>SOS</span><span class="sos-subtext">HOLD 3 SEC</span>';
+        }
+        
+        // Receiver sees full screen alert
+        function showIncomingAlert() {
+            document.getElementById('alertType').textContent = emergencyLabels[currentEmergency];
+            document.getElementById('alertOverlay').classList.add('active');
+            
+            // Vibrate and sound
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+            playAlertSound();
+        }
+        
+        function playAlertSound() {
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHP8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8LdnHQUuh9Dz2YU2Bhxpv+zplkcODVGm5O+4ZSAEMYrO89GFNwYdcfDr4ZdJDQtPp+XysWUeBjiS1/LNfi0GI33R8tOENAcdcO/r4phJDQxPp+TwxWUhBDeOzvPXhjYGHG3A7+SaSQ0MTKjl8bhkIAU2jc7z2YU1Bhxwv+zmmUgNC1Ko5O/EZSAFNo/M89CEMwYdcfDr4plHDAtQp+TvvWUfBTiOz/PShjUGG3Dw7OKZRwwLUqjl8b1kHwU3jM7z1YU1Bxtw8OzhmEcNC1Ko5fG+ZSAF');
+                audio.play();
+            } catch(e) {}
+        }
+        
+        function callSender() {
+            window.location.href = 'tel:+447700900003';
+        }
+        
+        function respond(response) {
+            if (response === 'coming') {
+                // Store response
+                localStorage.setItem('rubisos_response', JSON.stringify({
+                    from: 'tami',
+                    response: 'coming',
+                    timestamp: Date.now()
+                }));
+                
+                // Show confirmation
+                document.getElementById('alertOverlay').classList.remove('active');
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById('screen-confirmation').classList.add('active');
+                
+                // Auto open navigation after 2 seconds
+                setTimeout(() => {
+                    openNavigation();
+                }, 2000);
+                
+            } else {
+                document.getElementById('alertOverlay').classList.remove('active');
+                backToWaiting();
+            }
+        }
+        
+        function openNavigation() {
+            const lat = 51.532;
+            const lng = -0.178;
+            const address = 'N3 3DP, London';
+            
+            // Try Waze first
+            const wazeUrl = `waze://?ll=${lat},${lng}&navigate=yes`;
+            
+            // Fallback to Google Maps
+            const googleUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
+            
+            // Fallback to Apple Maps
+            const appleUrl = `http://maps.apple.com/?daddr=${lat},${lng}&dirflg=d`;
+            
+            // Try Waze
+            window.location.href = wazeUrl;
+            
+            // If Waze doesn't open in 1 second, try Google Maps
+            setTimeout(() => {
+                window.location.href = googleUrl;
+            }, 1000);
+            
+            // If neither opens, use Apple Maps
+            setTimeout(() => {
+                window.location.href = appleUrl;
+            }, 2000);
+        }
+        
+        function backToWaiting() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-tami').classList.add('active');
+        }
+        
+        function cancelSOS() {
+            if (confirm('Cancel this emergency?')) {
+                localStorage.removeItem('rubisos_alert');
+                localStorage.removeItem('rubisos_response');
+                switchUser();
+            }
+        }
+        
+        // Test functions
+        function simulateReceiveOnTami() {
+            alert('📱 On Tami\'s device:\n\nFull-screen red alert would appear with:\n• Yosi\'s name\n• Location: N3 3DP, London\n• Distance: 2.1 km\n• Phone: +44 7700 900003\n• Emergency type\n\nTap "Simulate Tami Responds" to see Yosi\'s screen update!');
+        }
+        
+        function simulateTamiResponse() {
+            document.getElementById('noResponse').style.display = 'none';
+            document.getElementById('hasResponse').style.display = 'block';
+        }
+        
+        // Polling for cross-device sync
+        setInterval(() => {
+            // Check if Tami received alert
+            if (currentUser === 'tami' && !document.getElementById('alertOverlay').classList.contains('active')) {
+                const alert = localStorage.getItem('rubisos_alert');
+                if (alert) {
+                    alertData = JSON.parse(alert);
+                    if (alertData.from === 'yosi') {
+                        showIncomingAlert();
+                    }
+                }
+            }
+            
+            // Check if Yosi got response
+            if (currentUser === 'yosi' && document.getElementById('screen-waiting').classList.contains('active')) {
+                const response = localStorage.getItem('rubisos_response');
+                if (response) {
+                    const data = JSON.parse(response);
+                    if (data.from === 'tami' && data.response === 'coming') {
+                        document.getElementById('noResponse').style.display = 'none';
+                        document.getElementById('hasResponse').style.display = 'block';
+                        localStorage.removeItem('rubisos_response');
+                    }
+                }
+            }
+        }, 1000);
+        
+        // Clear on load
+        window.addEventListener('load', () => {
+            localStorage.removeItem('rubisos_alert');
+            localStorage.removeItem('rubisos_response');
+        });
+    </script>
+</body>
+</html>

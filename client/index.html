@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>rubiSOS - Emergency Response</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- CONNECTION STATUS -->
+    <div class="connection-bar" id="connectionBar">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="connectionText">Connecting...</span>
+    </div>
+
+    <!-- USER REGISTRATION -->
+    <div class="screen active" id="screen-register">
+        <div class="logo-section">
+            <div class="logo">🆘</div>
+            <h1>rubiSOS</h1>
+            <p class="tagline">Emergency response network</p>
+        </div>
+        
+        <div class="form-section">
+            <div class="input-group">
+                <label>Your Name</label>
+                <input type="text" id="userName" placeholder="Enter your name" value="">
+            </div>
+            
+            <div class="input-group">
+                <label>Phone Number</label>
+                <input type="tel" id="userPhone" placeholder="+44..." value="">
+            </div>
+            
+            <div class="input-group">
+                <label>Blood Type (optional)</label>
+                <select id="bloodType">
+                    <option value="">Not specified</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                </select>
+            </div>
+            
+            <div class="location-status" id="locationStatus">
+                <span class="loc-dot"></span>
+                <span id="locText">Getting GPS location...</span>
+            </div>
+            
+            <button class="btn-primary" id="registerBtn" onclick="registerUser()">
+                Join Network
+            </button>
+            
+            <p class="privacy-note">
+                Your location is only shared during active emergencies
+            </p>
+        </div>
+    </div>
+
+    <!-- MAIN APP (SENDER) -->
+    <div class="screen" id="screen-main">
+        <div class="header">
+            <div class="user-pill">
+                <div class="avatar" id="userAvatar">👤</div>
+                <span id="displayName">User</span>
+            </div>
+            <div class="nearby-count">
+                <span id="nearbyBadge">0 nearby</span>
+            </div>
+        </div>
+        
+        <div class="emergency-selector">
+            <p class="selector-label">Select Emergency Type:</p>
+            <div class="emergency-types">
+                <button class="type-btn selected" data-type="medical" onclick="selectEmergency('medical')">
+                    <span class="type-icon">🚑</span>
+                    <span>Medical</span>
+                </button>
+                
+                <button class="type-btn" data-type="crime" onclick="selectEmergency('crime')">
+                    <span class="type-icon">🦹</span>
+                    <span>Crime</span>
+                </button>
+                
+                <button class="type-btn" data-type="fire" onclick="selectEmergency('fire')">
+                    <span class="type-icon">🔥</span>
+                    <span>Fire</span>
+                </button>
+                
+                <button class="type-btn" data-type="other" onclick="selectEmergency('other')">
+                    <span class="type-icon">⚠️</span>
+                    <span>Other</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="sos-section">
+            <button class="sos-button" id="sosBtn" ontouchstart="startSOS(event)" ontouchend="endSOS()" onmousedown="startSOS(event)" onmouseup="endSOS()">
+                <span class="sos-text">SOS</span>
+                <span class="sos-hint">HOLD 3 SECONDS</span>
+            </button>
+            
+            <p class="sos-info">
+                Press and hold to alert nearby helpers
+            </p>
+        </div>
+        
+        <button class="btn-secondary" onclick="logout()">
+            Log Out
+        </button>
+    </div>
+
+    <!-- WAITING FOR RESPONSE -->
+    <div class="screen" id="screen-waiting">
+        <div class="waiting-content">
+            <div class="pulse-ring">
+                <div class="pulse-dot">📡</div>
+            </div>
+            
+            <h2>Alert Sent!</h2>
+            <p class="waiting-text">Notifying nearby helpers...</p>
+            
+            <div id="responseStatus">
+                <p class="status-message">⏳ Waiting for someone to respond...</p>
+            </div>
+            
+            <button class="btn-danger" onclick="cancelAlert()">
+                Cancel Emergency
+            </button>
+        </div>
+    </div>
+
+    <!-- HELP IS COMING -->
+    <div class="screen" id="screen-help-coming">
+        <div class="success-content">
+            <div class="success-icon">✅</div>
+            
+            <h2>Help is on the way!</h2>
+            
+            <div class="responder-card">
+                <div class="responder-name" id="responderName">Someone</div>
+                <div class="responder-eta" id="responderETA">8 min</div>
+                <p>estimated arrival time</p>
+            </div>
+            
+            <button class="btn-secondary" onclick="backToMain()">
+                Back to Main
+            </button>
+        </div>
+    </div>
+
+    <!-- INCOMING ALERT (RECEIVER) -->
+    <div class="alert-overlay" id="alertOverlay">
+        <div class="alert-header">
+            <div class="alert-icon">🆘</div>
+            <h1>EMERGENCY!</h1>
+            <div class="alert-type-badge" id="overlayEmergencyType">🚑 Medical</div>
+        </div>
+        
+        <div class="alert-info">
+            <div class="sender-card">
+                <div class="sender-avatar">👤</div>
+                <div class="sender-details">
+                    <div class="sender-name" id="alertSenderName">Someone</div>
+                    <button class="call-btn" onclick="callSender()">📞 Call</button>
+                </div>
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>📍 Location</label>
+                    <value id="alertAddress">Unknown</value>
+                </div>
+                
+                <div class="info-item">
+                    <label>📏 Distance</label>
+                    <value class="highlight" id="alertDistance">0.0 km</value>
+                </div>
+                
+                <div class="info-item">
+                    <label>⏱️ Your ETA</label>
+                    <value class="highlight" id="alertETA">8 min</value>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert-actions">
+            <button class="btn-respond accept" onclick="acceptAlert()">
+                ✅ I'M COMING
+            </button>
+            
+            <button class="btn-respond decline" onclick="declineAlert()">
+                ❌ CAN'T HELP
+            </button>
+        </div>
+    </div>
+
+    <!-- NAVIGATION SCREEN -->
+    <div class="screen" id="screen-navigation">
+        <div class="nav-content">
+            <div class="nav-icon">🗺️</div>
+            
+            <h2>Navigate to Emergency</h2>
+            
+            <p>ETA: <strong id="navETA">8 minutes</strong></p>
+            
+            <div class="nav-buttons">
+                <button class="btn-nav" onclick="openWaze()">
+                    <span>📍</span> Open in Waze
+                </button>
+                
+                <button class="btn-nav" onclick="openGoogleMaps()">
+                    <span>🗺️</span> Open in Google Maps
+                </button>
+                
+                <button class="btn-nav" onclick="openAppleMaps()">
+                    <span>🍎</span> Open in Apple Maps
+                </button>
+            </div>
+            
+            <button class="btn-secondary" onclick="backToMain()">
+                Back to Monitoring
+            </button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

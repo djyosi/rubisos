@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🆘 rubiSOS - Test Mode</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo { font-size: 1.3rem; font-weight: 700; }
+        .test-badge {
+            background: #f59e0b;
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .container { flex: 1; padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; }
+        
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* User Selection */
+        .user-selection {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .user-selection h2 {
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+        .user-selection p {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        
+        .user-cards {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .user-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        .user-card:hover {
+            border-color: #3b82f6;
+            background: rgba(59,130,246,0.1);
+        }
+        .user-card.selected {
+            border-color: #22c55e;
+            background: rgba(34,197,94,0.1);
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 15px;
+        }
+        .user-card.tami .user-avatar { background: linear-gradient(135deg, #ec4899, #f472b6); }
+        .user-card.yosi .user-avatar { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+        
+        .user-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .user-location {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .user-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        
+        /* SOS Screen */
+        .sos-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 50vh;
+        }
+        
+        .current-user-bar {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+        .current-user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .current-user-info { flex: 1; }
+        .current-user-name { font-weight: 600; }
+        .current-user-address { font-size: 0.8rem; color: #94a3b8; }
+        .switch-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        
+        .sos-button {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(220, 38, 38, 0.5);
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .sos-button:active { transform: scale(0.95); }
+        .sos-button.counting { 
+            animation: pulse-red 1s infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            50% { box-shadow: 0 0 0 30px rgba(220, 38, 38, 0); }
+        }
+        .sos-label { font-size: 0.8rem; opacity: 0.9; }
+        
+        /* Emergency Active Screen */
+        .emergency-active {
+            text-align: center;
+            padding: 20px;
+        }
+        .emergency-pulse {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #dc2626;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            animation: emergency-pulse 1s infinite;
+        }
+        @keyframes emergency-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .nearby-helpers {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .nearby-helpers h3 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .helper-online { color: #22c55e; }
+        
+        .helper-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-left: 3px solid #22c55e;
+        }
+        .helper-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+        .helper-info { flex: 1; text-align: left; }
+        .helper-name { font-weight: 600; }
+        .helper-distance { font-size: 0.8rem; color: #94a3b8; }
+        .helper-eta { color: #22c55e; font-weight: 600; font-size: 0.9rem; }
+        
+        .map-preview {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            height: 200px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .map-dot {
+            position: absolute;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .map-dot.you { 
+            background: #dc2626; 
+            top: 60%; 
+            left: 40%; 
+            animation: bounce 2s infinite;
+            z-index: 10;
+        }
+        .map-dot.helper { 
+            background: #22c55e; 
+            top: 30%; 
+            left: 70%;
+            animation: bounce 2s infinite 0.5s;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .distance-line {
+            position: absolute;
+            top: 45%;
+            left: 45%;
+            width: 30%;
+            height: 2px;
+            background: rgba(255,255,255,0.3);
+            transform: rotate(-30deg);
+        }
+        .distance-label {
+            position: absolute;
+            top: 35%;
+            left: 55%;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        
+        .cancel-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .emergency-types {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .emergency-type {
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .emergency-type.selected {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.2);
+        }
+        .emergency-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .emergency-label { font-size: 0.8rem; }
+        
+        h2 { margin-bottom: 10px; }
+        .subtitle { color: #94a3b8; margin-bottom: 20px; font-size: 0.9rem; }
+        
+        .info-box {
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+        }
+        .info-box strong { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🆘 rubiSOS</div>
+        <div class="test-badge">TEST MODE</div>
+    </div>
+
+    <div class="container">
+        
+        <!-- USER SELECTION SCREEN -->
+        <div class="screen active" id="screen-select-user">
+            <div class="user-selection">
+                <h2>Select Test User</h2>
+                <p>Choose who you want to be for this test</p>
+                
+                <div class="info-box">
+                    <strong>📍 Test Scenario:</strong> Two users in London, 2.1 km apart.<br>
+                    When one presses SOS, the other gets notified.
+                </div>
+                
+                <div class="user-cards">
+                    <div class="user-card tami" onclick="selectUser('tami')">
+                        <div class="user-avatar">👩</div>
+                        <div class="user-name">Tami</div>
+                        <div class="user-location">
+                            📍 NW11 7NA, London
+                        </div>
+                        <div class="user-details">
+                            Blood: O+ | Phone: +44 7700 900001<br>
+                            Emergency: Mom (+44 7700 900002)
+                        </div>
+                    </div>
+                    
+                    <div class="user-card yosi" onclick="selectUser('yosi')">
+                        <div class="user-avatar">👨</div>
+                        <div class="user-name">Yosi</div>
+                        <div class="user-location">
+                            📍 N3 3DP, London
+                        </div>
+                        <div class="user-details">
+                            Blood: A+ | Phone: +44 7700 900003<br>
+                            Emergency: Partner (+44 7700 900004)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOS SCREEN -->
+        <div class="screen" id="screen-sos">
+            <div class="current-user-bar">
+                <div class="current-user-avatar" id="currentAvatar">👤</div>
+                <div class="current-user-info">
+                    <div class="current-user-name" id="currentName">Select User</div>
+                    <div class="current-user-address" id="currentAddress">--</div>
+                </div>
+                <button class="switch-btn" onclick="switchUser()">Switch</button>
+            </div>
+            
+            <div class="emergency-types">
+                <div class="emergency-type selected" onclick="selectEmergencyType(this, 'medical')">
+                    <div class="emergency-icon">🚑</div>
+                    <div class="emergency-label">Medical</div>
+                </div>
+                <div class="emergency-type" onclick="selectEmergencyType(this, 'crime')">
+                    <div class="emergency-icon">🦹</div>
+                    <div class="emergency-label">Crime</div>
+                </div>
+                <div class="emergency-type" onclick="selectEmergencyType(this, 'fire')">
+                    <div class="emergency-icon">🔥</div>
+                    <div class="emergency-label">Fire</div>
+                </div>
+                <div class="emergency-type" onclick="selectEmergencyType(this, 'accident')">
+                    <div class="emergency-icon">💥</div>
+                    <div class="emergency-label">Accident</div>
+                </div>
+            </div>
+            
+            <div class="sos-container">
+                <button class="sos-button" id="sosBtn">
+                    <span>SOS</span>
+                    <span class="sos-label">HOLD 3 SEC</span>
+                </button>
+                
+                <p style="color: #94a3b8; text-align: center; margin-top: 20px; font-size: 0.9rem;">
+                    Hold to broadcast to nearby helpers<br>
+                    <strong style="color: #fff;">2.1 km radius</strong> includes other test user
+                </p>
+            </div>
+        </div>
+
+        <!-- EMERGENCY ACTIVE -->
+        <div class="screen" id="screen-emergency">
+            <div class="emergency-active">
+                <div class="emergency-pulse">🆘</div>
+                <h2>EMERGENCY ACTIVE</h2>
+                <p class="subtitle">Broadcasting to nearby helpers...</p>
+                
+                <div class="map-preview">
+                    <div class="map-dot you">🆘</div>
+                    <div class="map-dot helper">👤</div>
+                    <div class="distance-line"></div>
+                    <div class="distance-label">2.1 km</div>
+                </div>
+                
+                <div class="nearby-helpers">
+                    <h3>
+                        <span class="helper-online">●</span>
+                        Nearby Helper Found
+                    </h3>
+                    
+                    <div class="helper-card" id="helperCard">
+                        <div class="helper-avatar" id="helperAvatar">👤</div>
+                        <div class="helper-info">
+                            <div class="helper-name" id="helperName">Loading...</div>
+                            <div class="helper-distance">📍 2.1 km away | London</div>
+                        </div>
+                        <div class="helper-eta">~8 min</div>
+                    </div>
+                </div>
+                
+                <button class="cancel-btn" onclick="cancelEmergency()">✕ Cancel Emergency</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Test User Data
+        const users = {
+            tami: {
+                name: 'Tami',
+                avatar: '👩',
+                address: 'NW11 7NA, London',
+                bloodType: 'O+',
+                phone: '+44 7700 900001',
+                emergencyContact: '+44 7700 900002 (Mom)',
+                location: { lat: 51.5883, lng: -0.1964 }
+            },
+            yosi: {
+                name: 'Yosi',
+                avatar: '👨',
+                address: 'N3 3DP, London',
+                bloodType: 'A+',
+                phone: '+44 7700 900003',
+                emergencyContact: '+44 7700 900004 (Partner)',
+                location: { lat: 51.6056, lng: -0.1876 }
+            }
+        };
+        
+        let currentUser = null;
+        let emergencyType = 'medical';
+        let sosTimer = null;
+        
+        function selectUser(userId) {
+            currentUser = userId;
+            const user = users[userId];
+            
+            // Update UI
+            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector('.' + userId).classList.add('selected');
+            
+            // Small delay then switch screen
+            setTimeout(() => {
+                document.getElementById('currentAvatar').textContent = user.avatar;
+                document.getElementById('currentName').textContent = user.name;
+                document.getElementById('currentAddress').textContent = user.address;
+                
+                document.getElementById('screen-select-user').classList.remove('active');
+                document.getElementById('screen-sos').classList.add('active');
+            }, 300);
+        }
+        
+        function switchUser() {
+            document.getElementById('screen-sos').classList.remove('active');
+            document.getElementById('screen-select-user').classList.add('active');
+            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+            currentUser = null;
+        }
+        
+        function selectEmergencyType(el, type) {
+            document.querySelectorAll('.emergency-type').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            emergencyType = type;
+        }
+        
+        // SOS Button Logic
+        const sosBtn = document.getElementById('sosBtn');
+        
+        sosBtn.addEventListener('mousedown', startHold);
+        sosBtn.addEventListener('touchstart', startHold);
+        sosBtn.addEventListener('mouseup', endHold);
+        sosBtn.addEventListener('touchend', endHold);
+        sosBtn.addEventListener('mouseleave', endHold);
+        
+        function startHold(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+            
+            sosBtn.classList.add('counting');
+            sosBtn.innerHTML = '<span>3</span><span class="sos-label">HOLD...</span>';
+            
+            let count = 3;
+            sosTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    sosBtn.innerHTML = `<span>${count}</span><span class="sos-label">HOLD...</span>`;
+                } else {
+                    clearInterval(sosTimer);
+                    activateEmergency();
+                }
+            }, 1000);
+        }
+        
+        function endHold() {
+            clearInterval(sosTimer);
+            sosBtn.classList.remove('counting');
+            sosBtn.innerHTML = '<span>SOS</span><span class="sos-label">HOLD 3 SEC</span>';
+        }
+        
+        function activateEmergency() {
+            // Vibrate
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 1000]);
+            }
+            
+            // Get the other user as the helper
+            const otherUserId = currentUser === 'tami' ? 'yosi' : 'tami';
+            const helper = users[otherUserId];
+            
+            // Update helper card
+            document.getElementById('helperAvatar').textContent = helper.avatar;
+            document.getElementById('helperName').textContent = helper.name + ' (Test User)';
+            
+            // Switch screen
+            document.getElementById('screen-sos').classList.remove('active');
+            document.getElementById('screen-emergency').classList.add('active');
+        }
+        
+        function cancelEmergency() {
+            if (confirm('Cancel this emergency alert?')) {
+                document.getElementById('screen-emergency').classList.remove('active');
+                document.getElementById('screen-sos').classList.add('active');
+            }
+        }
+        
+        // Get real location if available
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => console.log('GPS:', pos.coords.latitude, pos.coords.longitude),
+                (err) => console.log('GPS not available')
+            );
+        }
+    </script>
+</body>
+</html>

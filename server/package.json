@@ -1,0 +1,22 @@
+{
+  "name": "rubisos-server",
+  "version": "1.0.0",
+  "description": "rubiSOS Emergency Response Server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["emergency", "sos", "safety"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

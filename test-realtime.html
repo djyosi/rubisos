@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🆘 rubiSOS - Real-Time Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo { font-size: 1.3rem; font-weight: 700; }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .status-dot.connected { background: #22c55e; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .container { flex: 1; padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        /* User Selection */
+        .user-selection { text-align: center; padding: 40px 20px; }
+        .user-selection h2 { margin-bottom: 10px; font-size: 1.8rem; }
+        .user-selection p { color: #94a3b8; margin-bottom: 30px; }
+        
+        .user-cards { display: grid; gap: 20px; }
+        .user-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        .user-card:hover { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
+        .user-card.selected { border-color: #22c55e; background: rgba(34,197,94,0.1); }
+        
+        .user-avatar {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; margin-bottom: 15px;
+        }
+        .user-card.tami .user-avatar { background: linear-gradient(135deg, #ec4899, #f472b6); }
+        .user-card.yosi .user-avatar { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+        .user-name { font-size: 1.3rem; font-weight: 600; margin-bottom: 5px; }
+        .user-location { color: #94a3b8; font-size: 0.9rem; display: flex; align-items: center; gap: 5px; }
+        
+        /* Main App Screen */
+        .app-header {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .app-avatar { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .app-info { flex: 1; }
+        .app-name { font-weight: 600; }
+        .app-status { font-size: 0.8rem; color: #94a3b8; }
+        .switch-btn {
+            background: rgba(255,255,255,0.1); border: none;
+            padding: 8px 15px; border-radius: 8px; color: #fff;
+            font-size: 0.8rem; cursor: pointer;
+        }
+        
+        /* Waiting Screen (for receivers) */
+        .waiting-screen {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .radar {
+            width: 150px; height: 150px;
+            border-radius: 50%;
+            border: 2px solid rgba(34,197,94,0.3);
+            margin: 0 auto 30px;
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .radar::before {
+            content: ''; position: absolute;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            border: 2px solid rgba(34,197,94,0.1);
+            animation: radar 2s infinite;
+        }
+        @keyframes radar {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        .radar-icon { font-size: 3rem; }
+        .waiting-text { color: #22c55e; font-size: 1.2rem; margin-bottom: 10px; }
+        .waiting-sub { color: #94a3b8; font-size: 0.9rem; }
+        
+        /* SOS Button */
+        .sos-container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .sos-button {
+            width: 180px; height: 180px; border-radius: 50%;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border: none; color: white; font-size: 1.8rem; font-weight: 800;
+            cursor: pointer; box-shadow: 0 10px 40px rgba(220, 38, 38, 0.5);
+            transition: all 0.3s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .sos-button:active { transform: scale(0.95); }
+        .sos-button.counting { animation: pulse-red 1s infinite; }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); } 50% { box-shadow: 0 0 0 30px rgba(220, 38, 38, 0); } }
+        .sos-label { font-size: 0.8rem; opacity: 0.9; margin-top: 5px; }
+        
+        /* Incoming Alert Screen */
+        .incoming-alert {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            animation: alert-pulse 1s infinite;
+        }
+        @keyframes alert-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        .alert-icon { font-size: 4rem; margin-bottom: 15px; }
+        .alert-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+        .alert-subtitle { font-size: 1rem; opacity: 0.9; margin-bottom: 20px; }
+        
+        .sender-info {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            display: flex; align-items: center; gap: 15px;
+        }
+        .sender-avatar { width: 60px; height: 60px; border-radius: 50%; font-size: 2rem; display: flex; align-items: center; justify-content: center; }
+        .sender-details { text-align: left; flex: 1; }
+        .sender-name { font-size: 1.3rem; font-weight: 600; }
+        .sender-distance { font-size: 0.9rem; opacity: 0.8; }
+        .sender-blood { font-size: 0.8rem; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; margin-top: 5px; display: inline-block; }
+        
+        .emergency-badge {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            margin: 15px 0;
+        }
+        
+        .response-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn-response {
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-coming { background: #22c55e; color: white; }
+        .btn-unable { background: rgba(255,255,255,0.2); color: white; }
+        .btn-response:hover { transform: translateY(-2px); }
+        
+        /* Response Received Screen */
+        .response-screen { text-align: center; padding: 40px 20px; }
+        .response-icon { font-size: 5rem; margin-bottom: 20px; }
+        .response-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 10px; }
+        .response-text { color: #94a3b8; margin-bottom: 30px; }
+        .responder-card {
+            background: rgba(34,197,94,0.1);
+            border: 1px solid #22c55e;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .responder-status { color: #22c55e; font-size: 1.2rem; font-weight: 600; }
+        .responder-eta { font-size: 2rem; font-weight: 700; margin: 10px 0; }
+        
+        .cancel-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px; color: white;
+            font-size: 1rem; cursor: pointer; width: 100%;
+        }
+        
+        .emergency-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0; }
+        .emergency-type { padding: 15px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 12px; text-align: center; cursor: pointer; }
+        .emergency-type.selected { border-color: #dc2626; background: rgba(220, 38, 38, 0.2); }
+        .emergency-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        
+        h2 { margin-bottom: 10px; }
+        .subtitle { color: #94a3b8; margin-bottom: 20px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🆘 rubiSOS</div>
+        <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Offline</span>
+        </div>
+    </div>
+
+    <div class="container">
+        
+        <!-- USER SELECTION -->
+        <div class="screen active" id="screen-select">
+            <div class="user-selection">
+                <h2>Who are you?</h2>
+                <p>Select your profile to start testing</p>
+                
+                <div class="user-cards">
+                    <div class="user-card tami" onclick="selectUser('tami')">
+                        <div class="user-avatar">👩</div>
+                        <div class="user-name">Tami</div>
+                        <div class="user-location">📍 NW11 7NA, London</div>
+                    </div>
+                    
+                    <div class="user-card yosi" onclick="selectUser('yosi')">
+                        <div class="user-avatar">👨</div>
+                        <div class="user-name">Yosi</div>
+                        <div class="user-location">📍 N3 3DP, London</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- YOSI'S VIEW (Sender) -->
+        <div class="screen" id="screen-yosi">
+            <div class="app-header">
+                <div class="app-avatar" style="background: linear-gradient(135deg, #3b82f6, #06b6d4);">👨</div>
+                <div class="app-info">
+                    <div class="app-name">Yosi</div>
+                    <div class="app-status">Ready to send SOS</div>
+                </div>
+                <button class="switch-btn" onclick="switchUser()">Switch</button>
+            </div>
+            
+            <div class="emergency-types">
+                <div class="emergency-type selected" onclick="selectType(this, 'medical')">
+                    <div class="emergency-icon">🚑</div>
+                    <div class="emergency-label">Medical</div>
+                </div>
+                <div class="emergency-type" onclick="selectType(this, 'crime')">
+                    <div class="emergency-icon">🦹</div>
+                    <div class="emergency-label">Crime</div>
+                </div>
+                <div class="emergency-type" onclick="selectType(this, 'fire')">
+                    <div class="emergency-icon">🔥</div>
+                    <div class="emergency-label">Fire</div>
+                </div>
+                <div class="emergency-type" onclick="selectType(this, 'other')">
+                    <div class="emergency-icon">⚠️</div>
+                    <div class="emergency-label">Other</div>
+                </div>
+            </div>
+            
+            <div class="sos-container">
+                <button class="sos-button" id="sosBtn">
+                    <span>SOS</span>
+                    <span class="sos-label">HOLD 3 SEC</span>
+                </button>
+                
+                <p class="subtitle" style="text-align: center; margin-top: 20px;">
+                    Press and hold to send emergency alert to Tami<br>
+                    She's 2.1 km away (~8 min response time)
+                </p>
+            </div>
+        </div>
+
+        <!-- WAITING FOR RESPONSE (Yosi's view) -->
+        <div class="screen" id="screen-waiting">
+            <div class="response-screen">
+                <div class="response-icon">📡</div>
+                <div class="response-title">Alert Sent!</div>
+                <div class="response-text">
+                    Broadcasting to nearby helpers...
+                </div>
+                
+                <div id="waitingForResponse">
+                    <p style="color: #94a3b8;">⏳ Waiting for Tami to respond...</p>
+                </div>
+                
+                <div id="responseReceived" style="display: none;">
+                    <div class="responder-card">
+                        <div class="responder-status">✅ Tami is COMING!</div>
+                        <div class="responder-eta">8 min</div>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">She can see your exact location</p>
+                    </div>
+                </div>
+                
+                <button class="cancel-btn" onclick="cancelSOS()">✕ Cancel Emergency</button>
+            </div>
+        </div>
+
+        <!-- TAMI'S VIEW (Receiver - Waiting) -->
+        <div class="screen" id="screen-tami-waiting">
+            <div class="app-header">
+                <div class="app-avatar" style="background: linear-gradient(135deg, #ec4899, #f472b6);">👩</div>
+                <div class="app-info">
+                    <div class="app-name">Tami</div>
+                    <div class="app-status">Monitoring for alerts</div>
+                </div>
+                <button class="switch-btn" onclick="switchUser()">Switch</button>
+            </div>
+            
+            <div class="waiting-screen">
+                <div class="radar">
+                    <div class="radar-icon">📡</div>
+                </div>
+                
+                <div class="waiting-text">✅ Connected & Ready</div>
+                
+                <div class="waiting-sub">
+                    You'll be notified immediately<br>if Yosi sends an SOS alert<br><br>
+                    Distance: 2.1 km away
+                </div>
+            </div>
+        </div>
+
+        <!-- INCOMING ALERT (Tami's view when Yosi sends SOS) -->
+        <div class="screen" id="screen-incoming">
+            <div class="incoming-alert">
+                <div class="alert-icon">🆘</div>
+                
+                <div class="alert-title">EMERGENCY ALERT!</div>
+                
+                <div class="alert-subtitle">Someone nearby needs help</div>
+                
+                <div class="emergency-badge" id="emergencyType">
+                    🚑 MEDICAL EMERGENCY
+                </div>
+                
+                <div class="sender-info">
+                    <div class="sender-avatar" style="background: linear-gradient(135deg, #3b82f6, #06b6d4);">👨</div>
+                    
+                    <div class="sender-details">
+                        <div class="sender-name">Yosi</div>
+                        <div class="sender-distance">📍 2.1 km away • ~8 min</div>
+                        <div class="sender-blood">🩸 Blood Type: A+</div>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin: 15px 0;">
+                    <strong>📍 Location:</strong> N3 3DP, London<br>
+                    <strong>📱 Phone:</strong> +44 7700 900003<br>
+                    <strong>🚨 Emergency Contact:</strong> Partner (+44 7700 900004)
+                </div>
+                
+                <div class="response-buttons">
+                    <button class="btn-response btn-coming" onclick="respond('coming')">
+                        ✅ I'm Coming
+                    </button>
+                    
+                    <button class="btn-response btn-unable" onclick="respond('unable')">
+                        ❌ Can't Help
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESPONSE SENT (Tami's view after responding) -->
+        <div class="screen" id="screen-responded">
+            <div class="response-screen">
+                <div class="response-icon" id="responseIcon">✅</div>
+                
+                <div class="response-title" id="responseTitle">You're on the way!</div>
+                
+                <div class="response-text">
+                    Yosi has been notified that you're coming.<br>
+                    ETA: 8 minutes
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin: 20px 0;">
+                    <strong>📍 Navigate to:</strong><br>
+                    N3 3DP, London<br>
+                    <span style="color: #94a3b8; font-size: 0.9rem;">Tap to open in Maps</span>
+                </div>
+                
+                <button class="cancel-btn" onclick="backToWaiting()">Back to Monitoring</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        let ws = null;
+        let currentUser = null;
+        let emergencyType = 'medical';
+        let sosTimer = null;
+        let currentAlertId = null;
+        
+        const users = {
+            tami: { name: 'Tami', avatar: '👩', blood: 'O+', location: 'NW11 7NA' },
+            yosi: { name: 'Yosi', avatar: '👨', blood: 'A+', location: 'N3 3DP' }
+        };
+        
+        // Connect to WebSocket
+        function connectWebSocket() {
+            // Using mock WebSocket for demo (replace with real ws://192.168.1.169:8765)
+            updateStatus(true);
+            
+            // For demo purposes, we'll simulate the WebSocket behavior
+            // In production: ws = new WebSocket('ws://192.168.1.169:8765');
+        }
+        
+        function updateStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Online';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Offline';
+            }
+        }
+        
+        function selectUser(userId) {
+            currentUser = userId;
+            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector('.' + userId).classList.add('selected');
+            
+            setTimeout(() => {
+                document.getElementById('screen-select').classList.remove('active');
+                
+                if (userId === 'yosi') {
+                    document.getElementById('screen-yosi').classList.add('active');
+                } else {
+                    document.getElementById('screen-tami-waiting').classList.add('active');
+                }
+                
+                connectWebSocket();
+            }, 300);
+        }
+        
+        function switchUser() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-select').classList.add('active');
+            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('selected'));
+            currentUser = null;
+            updateStatus(false);
+        }
+        
+        function selectType(el, type) {
+            document.querySelectorAll('.emergency-type').forEach(t => t.classList.remove('selected'));
+            el.classList.add('selected');
+            emergencyType = type;
+        }
+        
+        // SOS Button
+        const sosBtn = document.getElementById('sosBtn');
+        
+        sosBtn.addEventListener('mousedown', startHold);
+        sosBtn.addEventListener('touchstart', startHold);
+        sosBtn.addEventListener('mouseup', endHold);
+        sosBtn.addEventListener('touchend', endHold);
+        sosBtn.addEventListener('mouseleave', endHold);
+        
+        function startHold(e) {
+            e.preventDefault();
+            sosBtn.classList.add('counting');
+            sosBtn.innerHTML = '<span>3</span><span class="sos-label">HOLD...</span>';
+            
+            let count = 3;
+            sosTimer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    sosBtn.innerHTML = `<span>${count}</span><span class="sos-label">HOLD...</span>`;
+                } else {
+                    clearInterval(sosTimer);
+                    sendSOS();
+                }
+            }, 1000);
+        }
+        
+        function endHold() {
+            clearInterval(sosTimer);
+            sosBtn.classList.remove('counting');
+            sosBtn.innerHTML = '<span>SOS</span><span class="sos-label">HOLD 3 SEC</span>';
+        }
+        
+        function sendSOS() {
+            // Vibrate
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 200, 500, 200, 1000]);
+            }
+            
+            currentAlertId = 'alert_' + Date.now();
+            
+            // Show waiting screen on Yosi's device
+            document.getElementById('screen-yosi').classList.remove('active');
+            document.getElementById('screen-waiting').classList.add('active');
+            
+            // Simulate Tami receiving after 2 seconds
+            setTimeout(() => {
+                // In real app, this would come via WebSocket
+                console.log('Tami would receive alert now');
+            }, 2000);
+        }
+        
+        // Manual trigger for testing (since we don't have real WebSocket server running)
+        // Call this function from browser console to simulate Tami receiving alert:
+        // simulateIncomingAlert()
+        window.simulateIncomingAlert = function() {
+            const typeLabels = {
+                medical: '🚑 MEDICAL EMERGENCY',
+                crime: '🦹 CRIME IN PROGRESS',
+                fire: '🔥 FIRE',
+                other: '⚠️ EMERGENCY'
+            };
+            
+            document.getElementById('emergencyType').textContent = typeLabels[emergencyType] || '⚠️ EMERGENCY';
+            document.getElementById('screen-tami-waiting').classList.remove('active');
+            document.getElementById('screen-incoming').classList.add('active');
+            
+            // Play alert sound (if browser allows)
+            playAlertSound();
+        };
+        
+        function playAlertSound() {
+            // Create beep sound
+            const audio = new Audio();
+            audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8LdnHQUuh9Dz2YU2Bhxqv+zplkcODVGm5O+4ZSAEMYrO89GFNwYdcfDr4ZdJDQtPp+XysWUeBjiS1/LNfi0GI33R8tOENAcdcO/r4phJDQxPp+TwxWUhBDeOzvPXhjYGHG3A7+SaSQ0MTKjl8bhkIAU2jc7z2YU1Bhxwv+zmmUgNC1Ko5O/EZSAFNo/M89CEMwYdcfDr4plHDAtQp+TvvWUfBTiOz/PShjUGG3Dw7OKZRwwLUqjl8b1kHwU3jM7z1YU1Bxtw8OzhmEcNC1Ko5fG+ZSAF';
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
+        
+        function respond(response) {
+            if (response === 'coming') {
+                document.getElementById('screen-incoming').classList.remove('active');
+                document.getElementById('screen-responded').classList.add('active');
+                
+                // In real app, send response back to Yosi via WebSocket
+                setTimeout(() => {
+                    // Simulate Yosi receiving response
+                    console.log('Yosi would see response now');
+                }, 1000);
+            } else {
+                backToWaiting();
+            }
+        }
+        
+        function backToWaiting() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if (currentUser === 'tami') {
+                document.getElementById('screen-tami-waiting').classList.add('active');
+            } else {
+                document.getElementById('screen-yosi').classList.add('active');
+            }
+        }
+        
+        function cancelSOS() {
+            if (confirm('Cancel this emergency?')) {
+                backToWaiting();
+            }
+        }
+        
+        // For testing: Press 'T' key to simulate Tami receiving alert
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 't' || e.key === 'T') {
+                if (currentUser === 'tami' && document.getElementById('screen-tami-waiting').classList.contains('active')) {
+                    simulateIncomingAlert();
+                }
+            }
+        });
+        
+        // For testing: Press 'R' key to simulate response received on Yosi's device
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                if (currentUser === 'yosi' && document.getElementById('screen-waiting').classList.contains('active')) {
+                    document.getElementById('waitingForResponse').style.display = 'none';
+                    document.getElementById('responseReceived').style.display = 'block';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
