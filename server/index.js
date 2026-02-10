@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const mongoose = require('mongoose');
 
 // Services
 const connectDB = require('./services/database');
@@ -35,60 +36,25 @@ app.use(express.static(path.join(__dirname, '../client')));
 const inMemoryUsers = new Map();
 const inMemoryAlerts = new Map();
 
-// Check if MongoDB is connected
-let mongoConnected = false;
-
-// Connect to database
-connectDB().then(() => {
-    mongoConnected = true;
-    console.log('✅ Using MongoDB for data storage');
-}).catch(() => {
-    mongoConnected = false;
-    console.log('⚠️ Using in-memory storage (no MongoDB)');
+// Connect to database (non-blocking)
+connectDB().catch(err => {
+    console.log('⚠️ MongoDB not available, using in-memory storage');
 });
 
-// Helper to get User model (MongoDB or in-memory)
-async function findUserByPhone(phone) {
-    if (mongoConnected) {
-        return await User.findOne({ phone });
-    }
-    return inMemoryUsers.get(phone);
-}
-
-async function createUser(userData) {
-    if (mongoConnected) {
-        const user = new User(userData);
-        await user.save();
-        return user;
-    }
-    const user = { ...userData, _id: 'user_' + Date.now(), createdAt: new Date() };
-    inMemoryUsers.set(userData.phone, user);
-    return user;
-}
-
-async function updateUser(phone, updates) {
-    if (mongoConnected) {
-        return await User.findOneAndUpdate({ phone }, updates, { new: true });
-    }
-    const user = inMemoryUsers.get(phone);
-    if (user) {
-        Object.assign(user, updates);
-        inMemoryUsers.set(phone, user);
-    }
-    return user;
-}
-
-// API Routes
-app.use('/api/users', userRoutes);
-app.use('/api/alerts', alertRoutes);
-
-// Fallback login endpoint (in-memory mode)
+// Fallback login endpoint (in-memory mode) - MUST be defined BEFORE app.use routes
 app.post('/api/users/login', async (req, res) => {
     try {
         const { phone } = req.body;
         console.log('Login attempt:', phone);
         
-        const user = await findUserByPhone(phone);
+        // Try MongoDB first if connected
+        let user;
+        if (mongoose.connection.readyState === 1) {
+            user = await User.findOne({ phone });
+        } else {
+            // Use in-memory
+            user = inMemoryUsers.get(phone);
+        }
         
         if (!user) {
             console.log('User not found:', phone);
@@ -99,7 +65,7 @@ app.post('/api/users/login', async (req, res) => {
         res.json({
             success: true,
             user: {
-                id: user._id || user.id,
+                id: user._id || user.id || 'user_' + phone,
                 phone: user.phone,
                 name: user.name,
                 dateOfBirth: user.dateOfBirth,
@@ -121,14 +87,20 @@ app.post('/api/users/register', async (req, res) => {
         console.log('Register attempt:', phone, name);
         
         // Check if user exists
-        const existingUser = await findUserByPhone(phone);
+        let existingUser;
+        if (mongoose.connection.readyState === 1) {
+            existingUser = await User.findOne({ phone });
+        } else {
+            existingUser = inMemoryUsers.get(phone);
+        }
+        
         if (existingUser) {
             console.log('User already exists:', phone);
             return res.json({
                 success: true,
                 message: 'User already exists',
                 user: {
-                    id: existingUser._id || existingUser.id,
+                    id: existingUser._id || existingUser.id || 'user_' + phone,
                     phone: existingUser.phone,
                     name: existingUser.name
                 }
@@ -136,7 +108,7 @@ app.post('/api/users/register', async (req, res) => {
         }
 
         // Create new user
-        const user = await createUser({
+        const userData = {
             phone,
             name,
             dateOfBirth: new Date(dateOfBirth),
@@ -145,7 +117,17 @@ app.post('/api/users/register', async (req, res) => {
             isOnline: false,
             canReceiveAlerts: true,
             alertRadius: 10
-        });
+        };
+
+        let user;
+        if (mongoose.connection.readyState === 1) {
+            const newUser = new User(userData);
+            await newUser.save();
+            user = newUser;
+        } else {
+            user = { ...userData, _id: 'user_' + Date.now(), createdAt: new Date() };
+            inMemoryUsers.set(phone, user);
+        }
 
         const age = Math.floor((new Date() - new Date(dateOfBirth)) / 31536000000);
         console.log('User created:', name, age);
@@ -165,6 +147,10 @@ app.post('/api/users/register', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// API Routes (these will be overridden by the specific endpoints above if needed)
+app.use('/api/users', userRoutes);
+app.use('/api/alerts', alertRoutes);
 
 // In-memory storage for active socket connections
 const activeSockets = new Map();
