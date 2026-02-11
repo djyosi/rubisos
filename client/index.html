@@ -1684,9 +1684,14 @@
         }
 
         function navigateTo(page) {
-            // Update menu active state
-            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
-            event.target.closest('.menu-item').classList.add('active');
+            // Update menu active state only if called from menu
+            if (event && event.target) {
+                const menuItem = event.target.closest('.menu-item');
+                if (menuItem) {
+                    document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+                    menuItem.classList.add('active');
+                }
+            }
 
             switch(page) {
                 case 'home':
