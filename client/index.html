@@ -7,6 +7,60 @@
     <meta name="theme-color" content="#1a1a1a">
     <title>rubiSOS - Emergency Response</title>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script>
+        // INLINE Live Alerts Functions (ensures they work)
+        let currentLiveFilter = 'all';
+        let currentIncidentId = null;
+        
+        async function loadLiveAlerts() {
+            console.log('Loading live alerts...');
+            const container = document.getElementById('liveAlertsList');
+            container.innerHTML = '<div style="text-align:center;padding:20px;">Loading...⏳</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/alerts/all-active`);
+                const data = await response.json();
+                console.log('Alerts loaded:', data);
+                
+                activeLiveAlerts = data.alerts || [];
+                
+                document.getElementById('liveActiveCount').textContent = 
+                    activeLiveAlerts.filter(a => a.status === 'active').length;
+                document.getElementById('liveTotalCount').textContent = activeLiveAlerts.length;
+                
+                renderLiveAlertsInline();
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<div style="color:#ff4444;text-align:center;">Error loading alerts</div>';
+            }
+        }
+        
+        function renderLiveAlertsInline() {
+            const container = document.getElementById('liveAlertsList');
+            
+            if (activeLiveAlerts.length === 0) {
+                container.innerHTML = `
+                    <div class="stat-card" style="text-align:center;padding:40px;">
+                        <div style="font-size:48px;">✅</div>
+                        <p style="color:#888;">No active alerts</p>
+                    </div>`;
+                return;
+            }
+            
+            container.innerHTML = activeLiveAlerts.map(alert => `
+                <div class="stat-card" style="margin-bottom:15px;border-left:4px solid #ff4444;cursor:pointer;"
+                     onclick="showToast('Tapped: ${alert.alertId}', 'success')">
+                    <div style="display:flex;justify-content:space-between;">
+                        <span style="font-weight:600;font-size:18px;">🚨 ${alert.type.toUpperCase()}</span>
+                        <span style="color:#ff4444;">🔴 ACTIVE</span>
+                    </div>
+                    <p>From: ${alert.senderName}</p>
+                    <p style="color:#888;">${alert.location?.address || 'Unknown location'}</p>
+                    <p style="color:#44ff44;">${alert.responderCount || 0} responders</p>
+                </div>
+            `).join('');
+        }
+    </script>
     <script src="live-alerts.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
